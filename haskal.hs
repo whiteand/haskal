@@ -18,9 +18,6 @@ type SourceFileContent = String
 
 type Error = String
 
--- [a-zA-Z](a-zA-Z_0-9)
--- Program
-
 parseId :: SourceFileContent -> Either Error (Token, SourceFileContent)
 parseId [] = Left "Unexpect EOF"
 parseId (firstCharacter : rest)
