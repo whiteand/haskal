@@ -1,3 +1,5 @@
+set fallback
+
 repl:
   stack repl ./haskal.hs
 
