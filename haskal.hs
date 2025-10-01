@@ -29,10 +29,12 @@ type Error = (SourcePtr, String)
 
 type PtrChar = (SourcePtr, Maybe Char)
 
-parseId :: [PtrChar] -> Either Error (Token, [PtrChar])
+eofError :: SourcePtr -> Either Error a
+eofError pos = Left (pos, "Unexpected EOF")
+
+parseId :: TokenParser
 parseId [] = error "Unexpected empty position"
-parseId [(pos, Nothing)] = Left (pos, "Unexpected EOF")
-parseId ((_, Nothing) : _) = error "Unexpected absence of character"
+parseId ((pos, Nothing) : _) = eofError pos
 parseId ((pos, Just firstCharacter) : rest)
   | isAlpha firstCharacter = Right (Id parsedId, restCode)
   | otherwise = Left (pos, "first character is not alpha")
@@ -43,8 +45,65 @@ parseId ((pos, Just firstCharacter) : rest)
     isAlphaNum' (_, Nothing) = False
     isAlphaNum' (_, Just c) = isAlphaNum c
 
+type TokenParser = [PtrChar] -> Either Error (Token, [PtrChar])
+
+createSingleCharParser :: Char -> (SourcePtr -> Token) -> TokenParser
+createSingleCharParser char createToken [] = error "Unexpected empty position"
+createSingleCharParser char createToken ((pos, Nothing) : _) = eofError pos
+createSingleCharParser char createToken ((pos, Just c) : rest)
+  | c == char = Right (createToken pos, rest)
+  | otherwise = Left (pos, "Expected '" ++ [char] ++ "', but '" ++ [c] ++ "' occurred")
+
+parseIdOrKeyword :: TokenParser
+parseIdOrKeyword text =
+  fmap convertIdToKeyword (parseId text)
+  where
+    convertIdToKeyword (Id idString, rest) =
+      case map toLower idString of
+        "program" -> (KeywordProgram, rest)
+        "begin" -> (KeywordBegin, rest)
+        "end" -> (KeywordEnd, rest)
+        x -> (Id idString, rest)
+
+parseSpaces :: TokenParser
+parseSpaces [] = error "Unexpected empty position"
+parseSpaces ((pos, Nothing) : _) = Left (pos, "unexpected")
+parseSpaces ((pos, Just x) : xs)
+  | isSpace x = Right (Spaces spaces, restCode)
+  | otherwise = Left (pos, "Not a space")
+  where
+    (parsedSpacesWithPositions, restCode) = span isSpace' ((pos, Just x) : xs)
+    spaces = map (fromJust . snd) parsedSpacesWithPositions
+    isSpace' :: PtrChar -> Bool
+    isSpace' (_, Nothing) = False
+    isSpace' (_, Just c) = isSpace c
+
+alwaysFail :: String -> [PtrChar] -> Either Error a
+alwaysFail message [] = error "Unexpected empty position"
+alwaysFail message ((pos, _) : _) = Left (pos, message)
+
+parsers :: [TokenParser]
+parsers =
+  [ parseIdOrKeyword,
+    parseSpaces,
+    createSingleCharParser ';' (const SemiColon),
+    createSingleCharParser '.' (const Dot)
+  ]
+
 parseTokens :: [PtrChar] -> Either Error [Token]
-parseTokens content = Right [Id "Hello"]
+parseTokens [] = error "Unexpected empty position"
+parseTokens ((pos, Nothing) : _) = Right []
+parseTokens content =
+  singleTokenResult >>= \(token, rest) ->
+    fmap (token :) (parseTokens rest)
+  where
+    singleTokenResult :: Either Error (Token, [PtrChar])
+    singleTokenResult = foldr tryParser (alwaysFail "Unexpected token" content) parsers
+    tryParser :: TokenParser -> Either Error (Token, [PtrChar]) -> Either Error (Token, [PtrChar])
+    -- Should we return previous error or not
+    -- Should we use applicable logic here
+    tryParser parser (Left _) = parser content
+    tryParser parser (Right r) = Right r
 
 nextLineStart :: SourcePtr -> SourcePtr
 nextLineStart (SourcePtr filePath lineNumber _) =
@@ -70,11 +129,13 @@ addPtrsToString filePath = go startPosition
 
     startPosition = SourcePtr {filePath, lineNumber = 1, column = 1}
 
+stringToTokens :: FilePath -> String -> Either Error [Token]
+stringToTokens filePath content = parseTokens (addPtrsToString filePath content)
+
 formatFile :: FilePath -> IO ()
 formatFile filePath = do
   content <- readFile filePath
-  let contentWithCoordinates = addPtrsToString filePath content
-  let tokenizerResult = parseTokens contentWithCoordinates
+  let tokenizerResult = stringToTokens filePath content
   case tokenizerResult of
     Left (ptr, err) -> error (show ptr ++ err)
     Right result -> do
