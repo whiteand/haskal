@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Applicative (asum)
 import Data.Char
 import Data.Either
 import Data.Maybe
@@ -87,23 +88,20 @@ parsers =
   [ parseIdOrKeyword,
     parseSpaces,
     createSingleCharParser ';' (const SemiColon),
-    createSingleCharParser '.' (const Dot)
+    createSingleCharParser '.' (const Dot),
+    alwaysFail "Unexpected token"
   ]
 
 parseTokens :: [PtrChar] -> Either Error [Token]
 parseTokens [] = error "Unexpected empty position"
 parseTokens ((pos, Nothing) : _) = Right []
-parseTokens content =
-  singleTokenResult >>= \(token, rest) ->
-    fmap (token :) (parseTokens rest)
+parseTokens content = do
+  (token, rest) <- singleTokenResult
+  fmap (token :) (parseTokens rest)
   where
-    singleTokenResult :: Either Error (Token, [PtrChar])
-    singleTokenResult = foldr tryParser (alwaysFail "Unexpected token" content) parsers
-    tryParser :: TokenParser -> Either Error (Token, [PtrChar]) -> Either Error (Token, [PtrChar])
-    -- Should we return previous error or not
-    -- Should we use applicable logic here
-    tryParser parser (Left _) = parser content
-    tryParser parser (Right r) = Right r
+    singleTokenResult = foldr1 chooseParseResult [p content | p <- parsers]
+    chooseParseResult _ (Right r) = Right r
+    chooseParseResult nextResult _ = nextResult
 
 nextLineStart :: SourcePtr -> SourcePtr
 nextLineStart (SourcePtr filePath lineNumber _) =
@@ -132,16 +130,19 @@ addPtrsToString filePath = go startPosition
 stringToTokens :: FilePath -> String -> Either Error [Token]
 stringToTokens filePath content = parseTokens (addPtrsToString filePath content)
 
-formatFile :: FilePath -> IO ()
-formatFile filePath = do
+readFileTokens :: FilePath -> IO [Token]
+readFileTokens filePath = do
   content <- readFile filePath
   let tokenizerResult = stringToTokens filePath content
-  case tokenizerResult of
-    Left (ptr, err) -> error (show ptr ++ err)
-    Right result -> do
-      print result
+  either failOnError return tokenizerResult
+  where
+    failOnError (ptr, err) = error (show ptr ++ err)
 
--- TODO: add writing to the file
+formatFile :: FilePath -> IO ()
+formatFile filePath = do
+  tokens <- readFileTokens filePath
+  -- TODO: add writing to the file
+  print tokens
 
 formatFiles :: [FilePath] -> IO ()
 formatFiles = mapM_ formatFile
