@@ -23,6 +23,9 @@ data SourcePtr
     column :: Int
   }
 
+data ParserInput = Eof SourcePtr | Char SourcePtr Char ParserInput
+  deriving (Show)
+
 instance Show SourcePtr where
   show s = filePath s ++ ":" ++ show (lineNumber s) ++ ":" ++ show (column s)
 
@@ -33,25 +36,30 @@ type PtrChar = (SourcePtr, Maybe Char)
 eofError :: SourcePtr -> Either Error a
 eofError pos = Left (pos, "Unexpected EOF")
 
+-- consumeWhile returns a range which has inclusive start
+-- and exclusive end. also returns consumed string and
+-- remaining parser input
+consumeWhile :: (Char -> Bool) -> ParserInput -> (SourcePtr, SourcePtr, String, ParserInput)
+consumeWhile _ (Eof pos) = (pos, pos, "", Eof pos)
+consumeWhile pred (Char pos c rest)
+  | pred c = (pos, end, c : restString, remainingParserInput)
+  | otherwise = (pos, pos, "", Char pos c rest)
+  where
+    (_, end, restString, remainingParserInput) = consumeWhile pred rest
+
 parseId :: TokenParser
-parseId [] = error "Unexpected empty position"
-parseId ((pos, Nothing) : _) = eofError pos
-parseId ((pos, Just firstCharacter) : rest)
-  | isAlpha firstCharacter = Right (Id parsedId, restCode)
+parseId (Eof pos) = eofError pos
+parseId (Char pos firstCharacter rest)
+  | isAlpha firstCharacter = Right (Id (firstCharacter : suffixOfParsedId), remainingParserInput)
   | otherwise = Left (pos, "first character is not alpha")
   where
-    (parsedIdWithPositions, restCode) = span isAlphaNum' ((pos, Just firstCharacter) : rest)
-    parsedId = map (fromJust . snd) parsedIdWithPositions
-    isAlphaNum' :: PtrChar -> Bool
-    isAlphaNum' (_, Nothing) = False
-    isAlphaNum' (_, Just c) = isAlphaNum c
+    (_, _, suffixOfParsedId, remainingParserInput) = consumeWhile isAlphaNum rest
 
-type TokenParser = [PtrChar] -> Either Error (Token, [PtrChar])
+type TokenParser = ParserInput -> Either Error (Token, ParserInput)
 
 createSingleCharParser :: Char -> (SourcePtr -> Token) -> TokenParser
-createSingleCharParser char createToken [] = error "Unexpected empty position"
-createSingleCharParser char createToken ((pos, Nothing) : _) = eofError pos
-createSingleCharParser char createToken ((pos, Just c) : rest)
+createSingleCharParser char createToken (Eof pos) = eofError pos
+createSingleCharParser char createToken (Char pos c rest)
   | c == char = Right (createToken pos, rest)
   | otherwise = Left (pos, "Expected '" ++ [char] ++ "', but '" ++ [c] ++ "' occurred")
 
@@ -67,21 +75,16 @@ parseIdOrKeyword text =
         x -> (Id idString, rest)
 
 parseSpaces :: TokenParser
-parseSpaces [] = error "Unexpected empty position"
-parseSpaces ((pos, Nothing) : _) = Left (pos, "unexpected")
-parseSpaces ((pos, Just x) : xs)
-  | isSpace x = Right (Spaces spaces, restCode)
+parseSpaces (Eof pos) = eofError pos
+parseSpaces (Char pos x xs)
+  | isSpace x = Right (Spaces (x : restSpaces), remainingParserInput)
   | otherwise = Left (pos, "Not a space")
   where
-    (parsedSpacesWithPositions, restCode) = span isSpace' ((pos, Just x) : xs)
-    spaces = map (fromJust . snd) parsedSpacesWithPositions
-    isSpace' :: PtrChar -> Bool
-    isSpace' (_, Nothing) = False
-    isSpace' (_, Just c) = isSpace c
+    (_, _, restSpaces, remainingParserInput) = consumeWhile isSpace xs
 
-alwaysFail :: String -> [PtrChar] -> Either Error a
-alwaysFail message [] = error "Unexpected empty position"
-alwaysFail message ((pos, _) : _) = Left (pos, message)
+alwaysFail :: String -> ParserInput -> Either Error a
+alwaysFail message (Eof pos) = Left (pos, message)
+alwaysFail message (Char pos _ _) = Left (pos, message)
 
 parsers :: [TokenParser]
 parsers =
@@ -92,9 +95,8 @@ parsers =
     alwaysFail "Unexpected token"
   ]
 
-parseTokens :: [PtrChar] -> Either Error [Token]
-parseTokens [] = error "Unexpected empty position"
-parseTokens ((pos, Nothing) : _) = Right []
+parseTokens :: ParserInput -> Either Error [Token]
+parseTokens (Eof pos) = Right []
 parseTokens content = do
   (token, rest) <- singleTokenResult
   fmap (token :) (parseTokens rest)
@@ -114,21 +116,21 @@ nextLineStart (SourcePtr filePath lineNumber _) =
 nextColumn :: SourcePtr -> SourcePtr
 nextColumn ptr = ptr {column = column ptr + 1}
 
-addPtrsToString :: FilePath -> String -> [PtrChar]
-addPtrsToString filePath = go startPosition
+parserInputFromFileContent :: FilePath -> String -> ParserInput
+parserInputFromFileContent filePath = go startPosition
   where
-    go :: SourcePtr -> String -> [PtrChar]
-    go pos [] = [(pos, Nothing)]
-    go pos (x : xs) = (pos, Just x) : restPtrChars
+    go :: SourcePtr -> String -> ParserInput
+    go pos [] = Eof pos
+    go pos (x : xs) = Char pos x restParserInput
       where
-        restPtrChars = go (nextPosition x) xs
+        restParserInput = go (nextPosition x) xs
         nextPosition '\n' = nextLineStart pos
         nextPosition _ = nextColumn pos
 
     startPosition = SourcePtr {filePath, lineNumber = 1, column = 1}
 
 stringToTokens :: FilePath -> String -> Either Error [Token]
-stringToTokens filePath content = parseTokens (addPtrsToString filePath content)
+stringToTokens filePath content = parseTokens (parserInputFromFileContent filePath content)
 
 readFileTokens :: FilePath -> IO [Token]
 readFileTokens filePath = do
