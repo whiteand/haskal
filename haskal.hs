@@ -33,58 +33,83 @@ type Error = (SourcePtr, String)
 
 type PtrChar = (SourcePtr, Maybe Char)
 
+type ParseFunction a = ParserInput -> Either Error (a, ParserInput)
+
+newtype Parser a = Parser
+  { parse :: ParseFunction a
+  }
+
+instance Functor Parser where
+  fmap :: (a -> b) -> Parser a -> Parser b
+  fmap f previousParser = newParser
+    where
+      newParser = Parser {parse = newParse}
+      newParse parseInput = do
+        (prevResult, prevRest) <- parse previousParser parseInput
+        return (f prevResult, prevRest)
+
+type TokenParser = Parser Token
+
 eofError :: SourcePtr -> Either Error a
 eofError pos = Left (pos, "Unexpected EOF")
 
 -- consumeWhile returns a range which has inclusive start
 -- and exclusive end. also returns consumed string and
 -- remaining parser input
-consumeWhile :: (Char -> Bool) -> ParserInput -> (SourcePtr, SourcePtr, String, ParserInput)
-consumeWhile _ (Eof pos) = (pos, pos, "", Eof pos)
-consumeWhile pred (Char pos c rest)
-  | pred c = (pos, end, c : restString, remainingParserInput)
-  | otherwise = (pos, pos, "", Char pos c rest)
+consumeWhile :: (Char -> Bool) -> Parser (SourcePtr, SourcePtr, String)
+consumeWhile pred = Parser parse
   where
-    (_, end, restString, remainingParserInput) = consumeWhile pred rest
+    parse :: ParseFunction (SourcePtr, SourcePtr, String)
+    parse (Eof pos) = Right ((pos, pos, ""), Eof pos)
+    parse (Char pos c rest)
+      | pred c = Right ((pos, end, c : restString), remainingParserInput)
+      | otherwise = Right ((pos, pos, ""), Char pos c rest)
+      where
+        Right ((_, end, restString), remainingParserInput) = parse rest
 
 parseId :: TokenParser
-parseId (Eof pos) = eofError pos
-parseId (Char pos firstCharacter rest)
-  | isAlpha firstCharacter = Right (Id (firstCharacter : suffixOfParsedId), remainingParserInput)
-  | otherwise = Left (pos, "first character is not alpha")
+parseId = Parser parseId'
   where
-    (_, _, suffixOfParsedId, remainingParserInput) = consumeWhile isAlphaNum rest
-
-type TokenParser = ParserInput -> Either Error (Token, ParserInput)
+    parseId' (Eof pos) = eofError pos
+    parseId' (Char pos firstCharacter rest)
+      | isAlpha firstCharacter = Right (Id (firstCharacter : suffixOfParsedId), remainingParserInput)
+      | otherwise = Left (pos, "first character is not alpha")
+      where
+        Right ((_, _, suffixOfParsedId), remainingParserInput) = parse (consumeWhile isAlphaNum) rest
 
 createSingleCharParser :: Char -> (SourcePtr -> Token) -> TokenParser
-createSingleCharParser char createToken (Eof pos) = eofError pos
-createSingleCharParser char createToken (Char pos c rest)
-  | c == char = Right (createToken pos, rest)
-  | otherwise = Left (pos, "Expected '" ++ [char] ++ "', but '" ++ [c] ++ "' occurred")
+createSingleCharParser char createToken = Parser {parse = createSingleCharParser'}
+  where
+    createSingleCharParser' (Eof pos) = eofError pos
+    createSingleCharParser' (Char pos c rest)
+      | c == char = Right (createToken pos, rest)
+      | otherwise = Left (pos, "Expected '" ++ [char] ++ "', but '" ++ [c] ++ "' occurred")
 
 parseIdOrKeyword :: TokenParser
-parseIdOrKeyword text =
-  fmap convertIdToKeyword (parseId text)
+parseIdOrKeyword = fmap convertIdToKeyword parseId
   where
-    convertIdToKeyword (Id idString, rest) =
+    convertIdToKeyword (Id idString) =
       case map toLower idString of
-        "program" -> (KeywordProgram, rest)
-        "begin" -> (KeywordBegin, rest)
-        "end" -> (KeywordEnd, rest)
-        x -> (Id idString, rest)
+        "program" -> KeywordProgram
+        "begin" -> KeywordBegin
+        "end" -> KeywordEnd
+        x -> Id idString
 
 parseSpaces :: TokenParser
-parseSpaces (Eof pos) = eofError pos
-parseSpaces (Char pos x xs)
-  | isSpace x = Right (Spaces (x : restSpaces), remainingParserInput)
-  | otherwise = Left (pos, "Not a space")
+parseSpaces = Parser parseSpaces'
   where
-    (_, _, restSpaces, remainingParserInput) = consumeWhile isSpace xs
+    parseSpaces' (Eof pos) = eofError pos
+    parseSpaces' (Char pos x xs)
+      | isSpace x = Right (Spaces (x : restSpaces), remainingParserInput)
+      | otherwise = Left (pos, "Not a space")
+      where
+        Right ((_, _, restSpaces), remainingParserInput) = parse (consumeWhile isSpace) xs
 
-alwaysFail :: String -> ParserInput -> Either Error a
-alwaysFail message (Eof pos) = Left (pos, message)
-alwaysFail message (Char pos _ _) = Left (pos, message)
+alwaysFail :: String -> Parser a
+alwaysFail message = Parser alwaysFail'
+  where
+    alwaysFail' (Eof pos) = Left (pos, message)
+    alwaysFail' (Char pos _ _) = Left (pos, message)
 
 parsers :: [TokenParser]
 parsers =
@@ -101,7 +126,7 @@ parseTokens content = do
   (token, rest) <- singleTokenResult
   fmap (token :) (parseTokens rest)
   where
-    singleTokenResult = foldr1 chooseParseResult [p content | p <- parsers]
+    singleTokenResult = foldr1 chooseParseResult [parse p content | p <- parsers]
     chooseParseResult _ (Right r) = Right r
     chooseParseResult nextResult _ = nextResult
 
