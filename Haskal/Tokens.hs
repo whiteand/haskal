@@ -27,7 +27,6 @@ eofError pos = Left (pos, "Unexpected EOF")
 consumeWhile :: (Char -> Bool) -> Parser FileContent a (SourcePtr, SourcePtr, String)
 consumeWhile pred = Parser parse
   where
-    parse :: ParseFunction FileContent a (SourcePtr, SourcePtr, String)
     parse (Eof pos) = Right ((pos, pos, ""), Eof pos)
     parse (Char pos c rest)
       | pred c = Right ((pos, end, c : restString), remainingFileContent)
@@ -35,24 +34,34 @@ consumeWhile pred = Parser parse
       where
         Right ((_, end, restString), remainingFileContent) = parse rest
 
-parseId :: TokenParser
-parseId = Parser parseId'
+parseCharIf :: (Char -> Bool) -> (SourcePtr -> Char -> String) -> Parser FileContent Error (SourcePtr, Char)
+parseCharIf predicate getMessage = Parser parseChar
   where
-    parseId' :: ParseFunction FileContent Error Token
-    parseId' (Eof pos) = eofError pos
-    parseId' (Char pos firstCharacter rest)
-      | isAlpha firstCharacter = Right (Id (firstCharacter : suffixOfParsedId), remainingFileContent)
-      | otherwise = Left (pos, "first character is not alpha")
-      where
-        Right ((_, _, suffixOfParsedId), remainingFileContent) = parse (consumeWhile isAlphaNum) rest
+    parseChar :: ParseFunction FileContent Error (SourcePtr, Char)
+    parseChar (Eof pos) = eofError pos
+    parseChar (Char pos char rest)
+      | predicate char = Right ((pos, char), rest)
+      | otherwise = Left (pos, getMessage pos char)
+
+parseAlpha :: Parser FileContent Error (SourcePtr, Char)
+parseAlpha = parseCharIf isAlpha (const (const "Expected alpha character"))
+
+parseManyAlphaNum :: Parser FileContent Error (SourcePtr, SourcePtr, String)
+parseManyAlphaNum = Parser (parse (consumeWhile isAlphaNum))
+
+parseId :: TokenParser
+parseId = liftA2 combineFirstAndRest parseAlpha parseManyAlphaNum
+  where
+    combineFirstAndRest (_, c) (_, _, rest) = Id (c : rest)
 
 createSingleCharParser :: Char -> (SourcePtr -> Token) -> TokenParser
-createSingleCharParser char createToken = Parser {parse = createSingleCharParser'}
-  where
-    createSingleCharParser' (Eof pos) = eofError pos
-    createSingleCharParser' (Char pos c rest)
-      | c == char = Right (createToken pos, rest)
-      | otherwise = Left (pos, "Expected '" ++ [char] ++ "', but '" ++ [c] ++ "' occurred")
+createSingleCharParser char createToken =
+  fmap
+    (createToken . fst)
+    ( parseCharIf
+        (== char)
+        (\pos c -> "Expected '" ++ [char] ++ "', but '" ++ [c] ++ "' occurred")
+    )
 
 parseIdOrKeyword :: TokenParser
 parseIdOrKeyword = fmap convertIdToKeyword parseId
@@ -64,15 +73,17 @@ parseIdOrKeyword = fmap convertIdToKeyword parseId
         "end" -> KeywordEnd
         x -> Id idString
 
-parseSpaces :: TokenParser
-parseSpaces = Parser parseSpaces'
-  where
-    parseSpaces' (Eof pos) = eofError pos
-    parseSpaces' (Char pos x xs)
-      | isSpace x = Right (Spaces (x : restSpaces), remainingParserInput)
-      | otherwise = Left (pos, "Not a space")
-      where
-        Right ((_, _, restSpaces), remainingParserInput) = parse (consumeWhile isSpace) xs
+parseSpaces :: Parser FileContent Error String
+parseSpaces =
+  Parser
+    ( \text -> do
+        ((pos, _, restSpaces), remainingFileContent) <- parse (consumeWhile isSpace) text
+        case restSpaces of
+          [] -> Left (pos, "Not a space")
+          spaces -> Right (spaces, remainingFileContent)
+    )
+
+parseSpacesToken = fmap Spaces parseSpaces
 
 alwaysFail :: String -> Parser FileContent Error a
 alwaysFail message = Parser alwaysFail'
@@ -80,24 +91,25 @@ alwaysFail message = Parser alwaysFail'
     alwaysFail' (Eof pos) = Left (pos, message)
     alwaysFail' (Char pos _ _) = Left (pos, message)
 
-parsers :: [TokenParser]
-parsers =
-  [ parseIdOrKeyword,
-    parseSpaces,
-    createSingleCharParser ';' (const SemiColon),
-    createSingleCharParser '.' (const Dot),
-    alwaysFail "Unexpected token"
-  ]
+tokenParser :: TokenParser
+tokenParser = Parser parse'
+  where
+    parse' text = foldr1 chooseParseResult [parse p text | p <- parsers]
+    chooseParseResult _ (Right r) = Right r
+    chooseParseResult nextResult _ = nextResult
+    parsers =
+      [ parseIdOrKeyword,
+        parseSpacesToken,
+        createSingleCharParser ';' (const SemiColon),
+        createSingleCharParser '.' (const Dot),
+        alwaysFail "Unexpected token"
+      ]
 
 parseTokens :: FileContent -> Either Error [Token]
 parseTokens (Eof pos) = Right []
 parseTokens content = do
-  (token, rest) <- singleTokenResult
+  (token, rest) <- parse tokenParser content
   fmap (token :) (parseTokens rest)
-  where
-    singleTokenResult = foldr1 chooseParseResult [parse p content | p <- parsers]
-    chooseParseResult _ (Right r) = Right r
-    chooseParseResult nextResult _ = nextResult
 
 stringToTokens :: FilePath -> String -> Either Error [Token]
 stringToTokens filePath content = parseTokens (parserInputFromFileContent filePath content)

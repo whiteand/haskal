@@ -14,3 +14,13 @@ instance Functor (Parser input error) where
       newParse parseInput = do
         (prevResult, prevRest) <- parse previousParser parseInput
         return (f prevResult, prevRest)
+
+instance Applicative (Parser input error) where
+  pure x = Parser (\input -> Right (x, input))
+  liftA2 f pa pb =
+    Parser
+      ( \input -> do
+          (a, restA) <- parse pa input
+          (b, restB) <- parse pb restA
+          return (f a b, restB)
+      )
