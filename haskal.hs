@@ -33,14 +33,14 @@ type Error = (SourcePtr, String)
 
 type PtrChar = (SourcePtr, Maybe Char)
 
-type ParseFunction a = ParserInput -> Either Error (a, ParserInput)
+type ParseFunction input error a = input -> Either error (a, input)
 
-newtype Parser a = Parser
-  { parse :: ParseFunction a
+newtype Parser input error a = Parser
+  { parse :: ParseFunction input error a
   }
 
-instance Functor Parser where
-  fmap :: (a -> b) -> Parser a -> Parser b
+instance Functor (Parser input error) where
+  fmap :: (a -> b) -> Parser input error a -> Parser input error b
   fmap f previousParser = newParser
     where
       newParser = Parser {parse = newParse}
@@ -48,7 +48,7 @@ instance Functor Parser where
         (prevResult, prevRest) <- parse previousParser parseInput
         return (f prevResult, prevRest)
 
-type TokenParser = Parser Token
+type TokenParser = Parser ParserInput Error Token
 
 eofError :: SourcePtr -> Either Error a
 eofError pos = Left (pos, "Unexpected EOF")
@@ -56,10 +56,10 @@ eofError pos = Left (pos, "Unexpected EOF")
 -- consumeWhile returns a range which has inclusive start
 -- and exclusive end. also returns consumed string and
 -- remaining parser input
-consumeWhile :: (Char -> Bool) -> Parser (SourcePtr, SourcePtr, String)
+consumeWhile :: (Char -> Bool) -> Parser ParserInput a (SourcePtr, SourcePtr, String)
 consumeWhile pred = Parser parse
   where
-    parse :: ParseFunction (SourcePtr, SourcePtr, String)
+    parse :: ParseFunction ParserInput a (SourcePtr, SourcePtr, String)
     parse (Eof pos) = Right ((pos, pos, ""), Eof pos)
     parse (Char pos c rest)
       | pred c = Right ((pos, end, c : restString), remainingParserInput)
@@ -70,6 +70,7 @@ consumeWhile pred = Parser parse
 parseId :: TokenParser
 parseId = Parser parseId'
   where
+    parseId' :: ParseFunction ParserInput Error Token
     parseId' (Eof pos) = eofError pos
     parseId' (Char pos firstCharacter rest)
       | isAlpha firstCharacter = Right (Id (firstCharacter : suffixOfParsedId), remainingParserInput)
@@ -105,7 +106,7 @@ parseSpaces = Parser parseSpaces'
       where
         Right ((_, _, restSpaces), remainingParserInput) = parse (consumeWhile isSpace) xs
 
-alwaysFail :: String -> Parser a
+alwaysFail :: String -> Parser ParserInput Error a
 alwaysFail message = Parser alwaysFail'
   where
     alwaysFail' (Eof pos) = Left (pos, message)
