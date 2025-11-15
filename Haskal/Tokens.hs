@@ -12,6 +12,8 @@ data Token
   | Id String
   | SemiColon
   | KeywordBegin
+  | KeywordUses
+  | KeywordType
   | Directive String
   | KeywordEnd
   | Dot
@@ -78,6 +80,8 @@ parseIdOrKeyword = fmap convertIdToKeyword parseId
         "program" -> KeywordProgram
         "begin" -> KeywordBegin
         "end" -> KeywordEnd
+        "uses" -> KeywordUses
+        "type" -> KeywordType
         x -> Id idString
 
 parseSpaces :: Parser FileContent Error String
@@ -126,6 +130,19 @@ readFileTokens filePath = do
 
 tp :: Parser FileContent e a -> String -> Either e (a, FileContent)
 tp parser input = parse parser (parserInputFromFileContent "t.pas" input)
+
+printFileTokens :: FilePath -> IO ()
+printFileTokens filePath = do
+  text <- readFile filePath
+  let fileContent = parserInputFromFileContent filePath text
+  let tokensResults = getTokenResults fileContent
+  mapM_ printResult tokensResults
+  where
+    getTokenResults input = case parse tokenParser input of
+      Right (token, rest) -> Right token : getTokenResults rest
+      Left e -> [Left e]
+    printResult (Left e) = print e
+    printResult (Right r) = print r
 
 -- >>> readFileTokens "example.pas"
 -- example.pas:8:15Unexpected token
