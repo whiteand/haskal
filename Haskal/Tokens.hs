@@ -3,6 +3,7 @@ module Haskal.Tokens where
 import Control.Applicative
 import Data.Char
 import Haskal.FileContent
+import Haskal.Helper
 import Haskal.Parser
 
 data Token
@@ -11,6 +12,7 @@ data Token
   | Id String
   | SemiColon
   | KeywordBegin
+  | Directive String
   | KeywordEnd
   | Dot
   deriving (Show)
@@ -94,12 +96,13 @@ alwaysFail :: String -> Parser FileContent Error a
 alwaysFail message = Parser alwaysFail'
   where
     alwaysFail' (Eof pos) = Left (pos, message)
-    alwaysFail' (Char pos _ _) = Left (pos, message)
+    alwaysFail' (Char pos c _) = Left (pos, message)
 
 tokenParser :: TokenParser
 tokenParser =
   parseIdOrKeyword
     <|> parseSpacesToken
+    <|> directiveParser
     <|> createSingleCharParser ';' (const SemiColon)
     <|> createSingleCharParser '.' (const Dot)
     <|> alwaysFail "Unexpected token"
@@ -123,3 +126,24 @@ readFileTokens filePath = do
 
 tp :: Parser FileContent e a -> String -> Either e (a, FileContent)
 tp parser input = parse parser (parserInputFromFileContent "t.pas" input)
+
+-- >>> readFileTokens "example.pas"
+-- example.pas:8:15Unexpected token
+
+directiveParser :: TokenParser
+directiveParser = Directive <$> directiveStringParser
+  where
+    directiveStringParser :: Parser FileContent Error String
+    directiveStringParser = liftA3 combine prefixParser parseUntilCloseCurly parseCloseCurly
+    combine :: String -> String -> Char -> String
+    combine prefix text close = prefix ++ text ++ [close]
+    prefixParser :: Parser FileContent Error String
+    prefixParser = liftA2 (\c d -> [c, d]) parseOpenCurly parseDollar
+    parseOpenCurly :: Parser FileContent Error Char
+    parseOpenCurly = snd <$> parseCharIf (== '{') (\_ pos -> "Expected open curly braces")
+    parseDollar :: Parser FileContent Error Char
+    parseDollar = snd <$> parseCharIf (== '$') (\_ pos -> "Expected dollar sign")
+    parseUntilCloseCurly :: Parser FileContent Error String
+    parseUntilCloseCurly = trd <$> consumeWhile (/= '}')
+    parseCloseCurly :: Parser FileContent Error Char
+    parseCloseCurly = snd <$> parseCharIf (== '}') (\_ pos -> "Expected close curly braces")
