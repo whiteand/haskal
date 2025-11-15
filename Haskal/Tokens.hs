@@ -13,6 +13,19 @@ data Token
   | SemiColon
   | KeywordBegin
   | KeywordUses
+  | TypeBoolean
+  | TypeInteger
+  | TypeString
+  | TypeLongint
+  | KeywordArray
+  | OperatorEqual
+  | OpenParens
+  | CloseParens
+  | OpenBrackets
+  | CloseBrackets
+  | KeywordRecord
+  | Colon
+  | Comma
   | KeywordType
   | Directive String
   | KeywordEnd
@@ -29,6 +42,24 @@ instance CannotParse FileContent Error where
 
 eofError :: SourcePtr -> Either Error a
 eofError pos = Left (pos, "Unexpected EOF")
+
+parseIdOrKeyword :: TokenParser
+parseIdOrKeyword = fmap convertIdToKeyword parseId
+  where
+    convertIdToKeyword (Id idString) =
+      case map toLower idString of
+        "program" -> KeywordProgram
+        "begin" -> KeywordBegin
+        "end" -> KeywordEnd
+        "uses" -> KeywordUses
+        "type" -> KeywordType
+        "boolean" -> TypeBoolean
+        "longint" -> TypeLongint
+        "array" -> KeywordArray
+        "integer" -> TypeInteger
+        "record" -> KeywordRecord
+        "string" -> TypeString
+        x -> Id idString
 
 -- consumeWhile returns a range which has inclusive start
 -- and exclusive end. also returns consumed string and
@@ -72,18 +103,6 @@ createSingleCharParser char createToken =
         (\pos c -> "Expected '" ++ [char] ++ "', but '" ++ [c] ++ "' occurred")
     )
 
-parseIdOrKeyword :: TokenParser
-parseIdOrKeyword = fmap convertIdToKeyword parseId
-  where
-    convertIdToKeyword (Id idString) =
-      case map toLower idString of
-        "program" -> KeywordProgram
-        "begin" -> KeywordBegin
-        "end" -> KeywordEnd
-        "uses" -> KeywordUses
-        "type" -> KeywordType
-        x -> Id idString
-
 parseSpaces :: Parser FileContent Error String
 parseSpaces =
   Parser
@@ -102,13 +121,41 @@ alwaysFail message = Parser alwaysFail'
     alwaysFail' (Eof pos) = Left (pos, message)
     alwaysFail' (Char pos c _) = Left (pos, message)
 
+exactParser :: [(String, r)] -> Parser FileContent Error r
+exactParser m = foldr ((<|>) . createParser) (alwaysFail (expectedOneOf m)) m
+  where
+    createParser :: (String, r) -> Parser FileContent Error r
+    createParser (message, r) = r <$ Parser (parsePrefix message)
+      where
+        parsePrefix :: String -> FileContent -> Either Error (String, FileContent)
+        parsePrefix [] input = Right ([], input)
+        parsePrefix (c : rest) input = parse (liftA2 (:) parseC (Parser (parsePrefix rest))) input
+          where
+            parseC = snd <$> parseCharIf (== c) (\pos char -> "Expected " ++ [c] ++ ", but found " ++ [char])
+
+    expectedOneOf :: [(String, r)] -> String
+    expectedOneOf m = "Expected one of: " ++ expectedList
+      where
+        expectedStrings = map fst m
+        expectedWithQuotes = map (\s -> "\"" ++ s ++ "\"") expectedStrings
+        expectedList = listJoin "|" expectedWithQuotes
+
 tokenParser :: TokenParser
 tokenParser =
   parseIdOrKeyword
     <|> parseSpacesToken
     <|> directiveParser
-    <|> createSingleCharParser ';' (const SemiColon)
-    <|> createSingleCharParser '.' (const Dot)
+    <|> exactParser
+      [ (";", SemiColon),
+        (".", Dot),
+        ("=", OperatorEqual),
+        ("(", OpenParens),
+        (":", Colon),
+        (")", CloseParens),
+        (",", Comma),
+        ("[", OpenBrackets),
+        ("]", CloseBrackets)
+      ]
     <|> alwaysFail "Unexpected token"
 
 parseTokens :: FileContent -> Either Error [Token]
