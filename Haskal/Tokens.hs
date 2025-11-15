@@ -1,5 +1,6 @@
 module Haskal.Tokens where
 
+import Control.Applicative
 import Data.Char
 import Haskal.FileContent
 import Haskal.Parser
@@ -17,6 +18,10 @@ data Token
 type Error = (SourcePtr, String)
 
 type TokenParser = Parser FileContent Error Token
+
+instance CannotParse FileContent Error where
+  createCannotParseError :: FileContent -> Error
+  createCannotParseError input = (getPos input, "Cannot parse")
 
 eofError :: SourcePtr -> Either Error a
 eofError pos = Left (pos, "Unexpected EOF")
@@ -92,18 +97,12 @@ alwaysFail message = Parser alwaysFail'
     alwaysFail' (Char pos _ _) = Left (pos, message)
 
 tokenParser :: TokenParser
-tokenParser = Parser parse'
-  where
-    parse' text = foldr1 chooseParseResult [parse p text | p <- parsers]
-    chooseParseResult _ (Right r) = Right r
-    chooseParseResult nextResult _ = nextResult
-    parsers =
-      [ parseIdOrKeyword,
-        parseSpacesToken,
-        createSingleCharParser ';' (const SemiColon),
-        createSingleCharParser '.' (const Dot),
-        alwaysFail "Unexpected token"
-      ]
+tokenParser =
+  parseIdOrKeyword
+    <|> parseSpacesToken
+    <|> createSingleCharParser ';' (const SemiColon)
+    <|> createSingleCharParser '.' (const Dot)
+    <|> alwaysFail "Unexpected token"
 
 parseTokens :: FileContent -> Either Error [Token]
 parseTokens (Eof pos) = Right []
@@ -121,3 +120,6 @@ readFileTokens filePath = do
   either failOnError return tokenizerResult
   where
     failOnError (ptr, err) = error (show ptr ++ err)
+
+tp :: Parser FileContent e a -> String -> Either e (a, FileContent)
+tp parser input = parse parser (parserInputFromFileContent "t.pas" input)

@@ -1,5 +1,7 @@
 module Haskal.Parser where
 
+import Control.Applicative
+
 type ParseFunction input error a = input -> Either error (a, input)
 
 newtype Parser input error a = Parser
@@ -23,4 +25,17 @@ instance Applicative (Parser input error) where
           (a, restA) <- parse pa input
           (b, restB) <- parse pb restA
           return (f a b, restB)
+      )
+
+class CannotParse input error where
+  createCannotParseError :: input -> error
+
+instance (CannotParse input error) => Alternative (Parser input error) where
+  empty = Parser (Left . createCannotParseError)
+  pa <|> pb =
+    Parser
+      ( \input ->
+          case parse pa input of
+            Right r -> Right r
+            Left _ -> parse pb input
       )

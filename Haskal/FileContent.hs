@@ -10,6 +10,10 @@ data SourcePtr
 data FileContent = Eof SourcePtr | Char SourcePtr Char FileContent
   deriving (Show)
 
+getPos :: FileContent -> SourcePtr
+getPos (Eof pos) = pos
+getPos (Char pos _ _) = pos
+
 instance Show SourcePtr where
   show s = filePath s ++ ":" ++ show (lineNumber s) ++ ":" ++ show (column s)
 
