@@ -15,10 +15,14 @@ data Token
   | KeywordUses
   | TypeBoolean
   | TypeInteger
+  | IntegerLiteral String
   | TypeString
+  | OperatorMinus
+  | OperatorPlus
   | TypeLongint
   | KeywordArray
   | OperatorEqual
+  | OperatorNotEqual
   | OpenParens
   | CloseParens
   | OpenBrackets
@@ -42,6 +46,9 @@ instance CannotParse FileContent Error where
 
 eofError :: SourcePtr -> Either Error a
 eofError pos = Left (pos, "Unexpected EOF")
+
+posParser :: Parser FileContent e SourcePtr
+posParser = getPos <$> inputParser
 
 parseIdOrKeyword :: TokenParser
 parseIdOrKeyword = fmap convertIdToKeyword parseId
@@ -83,16 +90,16 @@ parseCharIf predicate getMessage = Parser parseChar
       | predicate char = Right ((pos, char), rest)
       | otherwise = Left (pos, getMessage pos char)
 
-parseAlpha :: Parser FileContent Error (SourcePtr, Char)
-parseAlpha = parseCharIf isAlpha (const (const "Expected alpha character"))
-
-parseManyAlphaNum :: Parser FileContent Error (SourcePtr, SourcePtr, String)
-parseManyAlphaNum = Parser (parse (consumeWhile isAlphaNum))
-
 parseId :: TokenParser
-parseId = liftA2 combineFirstAndRest parseAlpha parseManyAlphaNum
+parseId =
+  Id
+    <$> liftA2
+      (:)
+      (snd <$> parseCharIf isAlphaOrUnderscore (\_ _ -> "Expected alpha   character or _"))
+      (trd <$> consumeWhile isAlphaNumOrUnderscore)
   where
-    combineFirstAndRest (_, c) (_, _, rest) = Id (c : rest)
+    isAlphaOrUnderscore x = isAlpha x || x == '_'
+    isAlphaNumOrUnderscore x = isAlphaNum x || x == '_'
 
 createSingleCharParser :: Char -> (SourcePtr -> Token) -> TokenParser
 createSingleCharParser char createToken =
@@ -145,13 +152,17 @@ tokenParser =
   parseIdOrKeyword
     <|> parseSpacesToken
     <|> directiveParser
+    <|> integerLiteralTokenParser
     <|> exactParser
       [ (";", SemiColon),
         (".", Dot),
         ("=", OperatorEqual),
+        ("<>", OperatorNotEqual),
         ("(", OpenParens),
+        ("+", OperatorPlus),
         (":", Colon),
         (")", CloseParens),
+        ("-", OperatorMinus),
         (",", Comma),
         ("[", OpenBrackets),
         ("]", CloseBrackets)
@@ -211,3 +222,19 @@ directiveParser = Directive <$> directiveStringParser
     parseUntilCloseCurly = trd <$> consumeWhile (/= '}')
     parseCloseCurly :: Parser FileContent Error Char
     parseCloseCurly = snd <$> parseCharIf (== '}') (\_ pos -> "Expected close curly braces")
+
+integerLiteralTokenParser :: TokenParser
+integerLiteralTokenParser = IntegerLiteral <$> integerLiteralStringParser
+
+integerLiteralStringParser :: Parser FileContent Error String
+integerLiteralStringParser = do
+  digit <- anyDigitParser
+  case digit of
+    '0' -> do
+      expectError anyDigitParser (\_ i -> (getPos i, "Unexpected digit"))
+      return "0"
+    d -> do
+      otherDigits <- many anyDigitParser
+      return (d : otherDigits)
+  where
+    anyDigitParser = snd <$> parseCharIf isDigit (\_ _ -> "Expected digit")
