@@ -40,6 +40,31 @@ instance CannotParse FileContent Error where
   createCannotParseError :: FileContent -> Error
   createCannotParseError input = (getPos input, "Cannot parse")
 
+instance FailWithMessage FileContent Error where
+  failWithMessage message input = (getPos input, message)
+
+posParser :: Parser FileContent e SourcePtr
+posParser = getPos <$> inputParser
+
+isEofParser :: Parser FileContent e Bool
+isEofParser = Parser parseIsEof
+  where
+    parseIsEof (Eof pos) = Right (True, Eof pos)
+    parseIsEof input = Right (False, input)
+
+anyCharParser :: Parser FileContent Error Char
+anyCharParser = Parser parseAnyChar
+  where
+    parseAnyChar (Eof pos) = eofError pos
+    parseAnyChar (Char _ char remaining) = Right (char, remaining)
+
+parseCharIf :: (Char -> Bool) -> String -> Parser FileContent Error Char
+parseCharIf pred expectedCharacterClass = do
+  c <- anyCharParser
+  if pred c
+    then return c
+    else fail ("Expected " ++ expectedCharacterClass ++ ", but '" ++ [c] ++ "' occurred")
+
 eofError :: SourcePtr -> Either Error a
 eofError pos = Left (pos, "Unexpected EOF")
 
@@ -61,57 +86,34 @@ parseIdOrKeyword = fmap convertIdToKeyword parseId
         "string" -> TypeString
         x -> Id idString
 
--- consumeWhile returns a range which has inclusive start
--- and exclusive end. also returns consumed string and
--- remaining parser input
-consumeWhile :: (Char -> Bool) -> Parser FileContent a (SourcePtr, SourcePtr, String)
-consumeWhile pred = Parser parse
-  where
-    parse (Eof pos) = Right ((pos, pos, ""), Eof pos)
-    parse (Char pos c rest)
-      | pred c = Right ((pos, end, c : restString), remainingFileContent)
-      | otherwise = Right ((pos, pos, ""), Char pos c rest)
-      where
-        Right ((_, end, restString), remainingFileContent) = parse rest
-
-parseCharIf :: (Char -> Bool) -> (SourcePtr -> Char -> String) -> Parser FileContent Error (SourcePtr, Char)
-parseCharIf predicate getMessage = Parser parseChar
-  where
-    parseChar :: ParseFunction FileContent Error (SourcePtr, Char)
-    parseChar (Eof pos) = eofError pos
-    parseChar (Char pos char rest)
-      | predicate char = Right ((pos, char), rest)
-      | otherwise = Left (pos, getMessage pos char)
-
-parseAlpha :: Parser FileContent Error (SourcePtr, Char)
-parseAlpha = parseCharIf isAlpha (const (const "Expected alpha character"))
-
-parseManyAlphaNum :: Parser FileContent Error (SourcePtr, SourcePtr, String)
-parseManyAlphaNum = Parser (parse (consumeWhile isAlphaNum))
+consumeWhile :: (Char -> Bool) -> Parser FileContent a String
+consumeWhile pred = do
+  isEof <- isEofParser
+  if isEof
+    then return []
+    else do
+      c <- withErr undefined anyCharParser
+      if pred c
+        then (c :) <$> consumeWhile pred
+        else return []
 
 parseId :: TokenParser
-parseId = liftA2 combineFirstAndRest parseAlpha parseManyAlphaNum
-  where
-    combineFirstAndRest (_, c) (_, _, rest) = Id (c : rest)
+parseId = do
+  alpha <- parseCharIf isAlpha "alpha character"
+  remaining <- consumeWhile isAlphaNum
+  return (Id (alpha : remaining))
 
-createSingleCharParser :: Char -> (SourcePtr -> Token) -> TokenParser
-createSingleCharParser char createToken =
-  fmap
-    (createToken . fst)
-    ( parseCharIf
-        (== char)
-        (\pos c -> "Expected '" ++ [char] ++ "', but '" ++ [c] ++ "' occurred")
-    )
+parseExactChar :: Char -> Parser FileContent Error Char
+parseExactChar char = parseCharIf (== char) ("'" ++ [char] ++ "'")
+
+createSingleCharParser :: Char -> Token -> TokenParser
+createSingleCharParser char token = token <$ parseExactChar char
 
 parseSpaces :: Parser FileContent Error String
-parseSpaces =
-  Parser
-    ( \text -> do
-        ((pos, _, restSpaces), remainingFileContent) <- parse (consumeWhile isSpace) text
-        case restSpaces of
-          [] -> Left (pos, "Not a space")
-          spaces -> Right (spaces, remainingFileContent)
-    )
+parseSpaces = do
+  s <- parseExactChar ' '
+  restSpaces <- consumeWhile isSpace
+  return (s : restSpaces)
 
 parseSpacesToken = fmap Spaces parseSpaces
 
@@ -125,13 +127,14 @@ exactParser :: [(String, r)] -> Parser FileContent Error r
 exactParser m = foldr ((<|>) . createParser) (alwaysFail (expectedOneOf m)) m
   where
     createParser :: (String, r) -> Parser FileContent Error r
-    createParser (message, r) = r <$ Parser (parsePrefix message)
+    createParser (message, r) = r <$ prefixParser message
       where
-        parsePrefix :: String -> FileContent -> Either Error (String, FileContent)
-        parsePrefix [] input = Right ([], input)
-        parsePrefix (c : rest) input = parse (liftA2 (:) parseC (Parser (parsePrefix rest))) input
-          where
-            parseC = snd <$> parseCharIf (== c) (\pos char -> "Expected " ++ [c] ++ ", but found " ++ [char])
+        prefixParser :: String -> Parser FileContent Error String
+        prefixParser [] = return []
+        prefixParser (c : remaining) = do
+          _ <- parseExactChar c
+          _ <- prefixParser remaining
+          return (c : remaining)
 
     expectedOneOf :: [(String, r)] -> String
     expectedOneOf m = "Expected one of: " ++ expectedList
@@ -163,6 +166,16 @@ parseTokens (Eof pos) = Right []
 parseTokens content = do
   (token, rest) <- parse tokenParser content
   fmap (token :) (parseTokens rest)
+
+tokensParser :: Parser FileContent Error [Token]
+tokensParser = do
+  isEof <- isEofParser
+  if isEof
+    then return []
+    else do
+      token <- tokenParser
+      tokens <- tokensParser
+      return (token : tokens)
 
 stringToTokens :: FilePath -> String -> Either Error [Token]
 stringToTokens filePath content = parseTokens (parserInputFromFileContent filePath content)
@@ -204,10 +217,10 @@ directiveParser = Directive <$> directiveStringParser
     prefixParser :: Parser FileContent Error String
     prefixParser = liftA2 (\c d -> [c, d]) parseOpenCurly parseDollar
     parseOpenCurly :: Parser FileContent Error Char
-    parseOpenCurly = snd <$> parseCharIf (== '{') (\_ pos -> "Expected open curly braces")
+    parseOpenCurly = parseExactChar '{'
     parseDollar :: Parser FileContent Error Char
-    parseDollar = snd <$> parseCharIf (== '$') (\_ pos -> "Expected dollar sign")
+    parseDollar = parseExactChar '$'
     parseUntilCloseCurly :: Parser FileContent Error String
-    parseUntilCloseCurly = trd <$> consumeWhile (/= '}')
+    parseUntilCloseCurly = consumeWhile (/= '}')
     parseCloseCurly :: Parser FileContent Error Char
-    parseCloseCurly = snd <$> parseCharIf (== '}') (\_ pos -> "Expected close curly braces")
+    parseCloseCurly = parseExactChar '}'

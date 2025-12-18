@@ -39,3 +39,33 @@ instance (CannotParse input error) => Alternative (Parser input error) where
             Right r -> Right r
             Left _ -> parse pb input
       )
+
+instance Monad (Parser input error) where
+  (>>=) parserA createParserB =
+    Parser
+      ( \input -> do
+          (a, remaining) <- parse parserA input
+          let parserB = createParserB a
+          parse parserB remaining
+      )
+
+inputParser :: Parser input error input
+inputParser = Parser (\input -> Right (input, input))
+
+mapErr :: Parser input error a -> (error -> newError) -> Parser input newError a
+mapErr parser createNewError =
+  Parser
+    ( \input -> do
+        case parse parser input of
+          Right (r, remaining) -> Right (r, remaining)
+          Left e -> Left (createNewError e)
+    )
+
+withErr :: e -> Parser input error a -> Parser input e a
+withErr error parser = mapErr parser (const error)
+
+class FailWithMessage input error where
+  failWithMessage :: String -> input -> error
+
+instance (FailWithMessage input error) => MonadFail (Parser input error) where
+  fail message = Parser (Left . failWithMessage message)
