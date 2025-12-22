@@ -111,7 +111,7 @@ createSingleCharParser char token = token <$ parseExactChar char
 
 parseSpaces :: Parser FileContent Error String
 parseSpaces = do
-  s <- parseExactChar ' '
+  s <- parseCharIf isSpace "whitespace"
   restSpaces <- consumeWhile isSpace
   return (s : restSpaces)
 
