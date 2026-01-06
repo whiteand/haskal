@@ -87,15 +87,7 @@ parseIdOrKeyword = fmap convertIdToKeyword parseId
         x -> Id idString
 
 consumeWhile :: (Char -> Bool) -> Parser FileContent a String
-consumeWhile pred = do
-  isEof <- isEofParser
-  if isEof
-    then return []
-    else do
-      c <- withErr undefined anyCharParser
-      if pred c
-        then (c :) <$> consumeWhile pred
-        else return []
+consumeWhile pred = parseWhile pred anyCharParser
 
 parseId :: TokenParser
 parseId = do
@@ -208,19 +200,10 @@ printFileTokens filePath = do
 -- example.pas:8:15Unexpected token
 
 directiveParser :: TokenParser
-directiveParser = Directive <$> directiveStringParser
-  where
-    directiveStringParser :: Parser FileContent Error String
-    directiveStringParser = liftA3 combine prefixParser parseUntilCloseCurly parseCloseCurly
-    combine :: String -> String -> Char -> String
-    combine prefix text close = prefix ++ text ++ [close]
-    prefixParser :: Parser FileContent Error String
-    prefixParser = liftA2 (\c d -> [c, d]) parseOpenCurly parseDollar
-    parseOpenCurly :: Parser FileContent Error Char
-    parseOpenCurly = parseExactChar '{'
-    parseDollar :: Parser FileContent Error Char
-    parseDollar = parseExactChar '$'
-    parseUntilCloseCurly :: Parser FileContent Error String
-    parseUntilCloseCurly = consumeWhile (/= '}')
-    parseCloseCurly :: Parser FileContent Error Char
-    parseCloseCurly = parseExactChar '}'
+directiveParser =
+  Directive <$> do
+    parseExactChar '{'
+    parseExactChar '$'
+    directive <- consumeWhile (/= '}')
+    parseExactChar '}'
+    return ("{$" ++ directive ++ "}")

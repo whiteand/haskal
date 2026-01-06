@@ -69,3 +69,16 @@ class FailWithMessage input error where
 
 instance (FailWithMessage input error) => MonadFail (Parser input error) where
   fail message = Parser (Left . failWithMessage message)
+
+parseWhile :: (x -> Bool) -> Parser input error x -> Parser input e [x]
+parseWhile pred parser = Parser parseWhile'
+  where
+    parseWhile' input = case parse parser input of
+      Left _ -> Right ([], input)
+      Right (x, remaining) ->
+        if pred x
+          then do
+            (xs, remainingInput) <- parseWhile' remaining
+            Right (x : xs, remainingInput)
+          else
+            Right ([], input)
