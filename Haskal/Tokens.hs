@@ -2,6 +2,7 @@ module Haskal.Tokens where
 
 import Control.Applicative
 import Data.Char
+import Data.List (intercalate)
 import Haskal.FileContent
 import Haskal.Helper
 import Haskal.Parser
@@ -133,7 +134,7 @@ exactParser m = foldr ((<|>) . createParser) (alwaysFail (expectedOneOf m)) m
       where
         expectedStrings = map fst m
         expectedWithQuotes = map (\s -> "\"" ++ s ++ "\"") expectedStrings
-        expectedList = listJoin "|" expectedWithQuotes
+        expectedList = intercalate "|" expectedWithQuotes
 
 tokenParser :: TokenParser
 tokenParser =
