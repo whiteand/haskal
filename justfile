@@ -1,7 +1,7 @@
 set fallback
 
 repl:
-  stack repl ./haskal.hs
+  @cabal repl
 
 run:
-  stack runhaskell ./haskal.hs -- example.pas
+  @cabal run -v0 haskal -- example.pas

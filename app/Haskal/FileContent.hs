@@ -15,7 +15,9 @@ getPos (Eof pos) = pos
 getPos (Char pos _ _) = pos
 
 instance Show SourcePtr where
-  show s = filePath s ++ ":" ++ show (lineNumber s) ++ ":" ++ show (column s)
+  show s = filePath ++ ":" ++ show lineNumber ++ ":" ++ show column
+    where
+      SourcePtr {filePath, lineNumber, column} = s
 
 type PtrChar = (SourcePtr, Maybe Char)
 
@@ -28,7 +30,9 @@ nextLineStart (SourcePtr filePath lineNumber _) =
     }
 
 nextColumn :: SourcePtr -> SourcePtr
-nextColumn ptr = ptr {column = column ptr + 1}
+nextColumn ptr = ptr {column = prevColumn + 1}
+  where
+    SourcePtr {column = prevColumn} = ptr
 
 parserInputFromFileContent :: FilePath -> String -> FileContent
 parserInputFromFileContent filePath = go startPosition

@@ -8,6 +8,9 @@ newtype Parser input error a = Parser
   { parse :: ParseFunction input error a
   }
 
+parse :: Parser input error a -> ParseFunction input error a
+parse (Parser {parse = p}) = p
+
 instance Functor (Parser input error) where
   fmap :: (a -> b) -> Parser input error a -> Parser input error b
   fmap f previousParser = newParser
@@ -62,7 +65,7 @@ mapErr parser createNewError =
     )
 
 withErr :: e -> Parser input error a -> Parser input e a
-withErr error parser = mapErr parser (const error)
+withErr err parser = mapErr parser (const err)
 
 class FailWithMessage input error where
   failWithMessage :: String -> input -> error
@@ -71,12 +74,12 @@ instance (FailWithMessage input error) => MonadFail (Parser input error) where
   fail message = Parser (Left . failWithMessage message)
 
 parseWhile :: (x -> Bool) -> Parser input error x -> Parser input e [x]
-parseWhile pred parser = Parser parseWhile'
+parseWhile predicate parser = Parser parseWhile'
   where
     parseWhile' input = case parse parser input of
       Left _ -> Right ([], input)
       Right (x, remaining) ->
-        if pred x
+        if predicate x
           then do
             (xs, remainingInput) <- parseWhile' remaining
             Right (x : xs, remainingInput)
