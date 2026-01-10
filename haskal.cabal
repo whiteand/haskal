@@ -55,6 +55,7 @@ executable haskal
   import: warnings
   -- .hs or .lhs file containing the Main module.
   other-modules:
+    Haskal.Diagnostic
     Haskal.FileContent
     Haskal.Helper
     Haskal.Parser
