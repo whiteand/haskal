@@ -67,6 +67,7 @@ executable haskal
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
   default-extensions:
+    DuplicateRecordFields
     MonadComprehensions
     NoFieldSelectors
     PatternGuards
