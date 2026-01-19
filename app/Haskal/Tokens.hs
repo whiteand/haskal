@@ -3,6 +3,7 @@ module Haskal.Tokens where
 import Control.Applicative
 import Data.Char
 import Data.List (intercalate)
+import Haskal.Diagnostic
 import Haskal.FileContent
 import Haskal.Parser
 
@@ -33,6 +34,7 @@ data Token
   deriving (Show)
 
 newtype ParsingError = ParsingError (SourcePtr, String)
+  deriving (Show)
 
 type TokenParser = Parser FileContent ParsingError Token
 
@@ -151,9 +153,13 @@ tokenParser =
       ]
     <|> alwaysFail "Unexpected token"
 
-stringToTokensResults :: FilePath -> String -> [Either ParsingError Token]
-stringToTokensResults filePath content = parseTokens (parserInputFromFileContent filePath content)
+stringToTokensResults :: FilePath -> String -> [Either Diagnostic Token]
+stringToTokensResults filePath sourceCode = mapErrorToDiagnostic <$> parseTokens fileContent
   where
+    mapErrorToDiagnostic (Right r) = Right r
+    mapErrorToDiagnostic (Left error) = Left (errorToDiagnostic fileContent error)
+
+    fileContent = filePathAndSourceCodeToFileContent filePath sourceCode
     parseTokens :: FileContent -> [Either ParsingError Token]
     parseTokens (Eof _) = []
     parseTokens remaining = do
@@ -161,8 +167,34 @@ stringToTokensResults filePath content = parseTokens (parserInputFromFileContent
         Left e -> [Left e]
         Right (token, rest) -> Right token : parseTokens rest
 
+errorToDiagnostic :: FileContent -> ParsingError -> Diagnostic
+errorToDiagnostic fileContent (ParsingError (ptr, message)) = Diagnostic elements
+  where
+    elements =
+      [ DiagnosticElementHeader header,
+        DiagnosticElementWindow sourceCodeWindow
+      ]
+    header = DiagnosticHeader {level = DiagnosticLevelError, content = message}
+    sourceCodeWindow =
+      DiagnosticWindow
+        { sourcePtr = ptr,
+          elements = windowElements
+        }
+    windowElements =
+      [ EmptyLine,
+        sourceLine,
+        label,
+        EmptyLine
+      ]
+    SourcePtr {lineNumber, column} = ptr
+    sourceLine = SourceLine {lineNumber, line = getLineText lineNumber fileContent}
+    label = Label {startColumn = column, endColumn = column + 1, content = message}
+
 tp :: Parser FileContent e a -> String -> Either e (a, FileContent)
-tp parser input = parse parser (parserInputFromFileContent "t.pas" input)
+tp parser input = parse parser (filePathAndSourceCodeToFileContent "t.pas" input)
+
+-- >>> tp tokenParser "1"
+-- Left (ParsingError (t.pas:1:1,"Unexpected token"))
 
 directiveParser :: TokenParser
 directiveParser =

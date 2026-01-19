@@ -11,8 +11,8 @@ formatFile filePath = do
   let tokensResults = stringToTokensResults filePath content
   forM_ tokensResults handleTokenResult
   where
-    handleTokenResult (Left (ParsingError (ptr, err))) = do
-      putStrLn (show ptr ++ ": " ++ err)
+    handleTokenResult (Left diagnostic) = do
+      print diagnostic
       exitFailure
     handleTokenResult (Right token) =
       print token

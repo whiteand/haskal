@@ -58,7 +58,8 @@ instance Show DiagnosticWindow where
         SourceLine {lineNumber} -> length $ show lineNumber
         Label {} -> 0
       sourceCodePadding = replicate 5 ' '
-      maxLineNumberCharsLength = maximum (map getLineNumberCharsLength elements)
+      maxLineNumberCharsLength = maximum (0 : lineNumberCharsLengths)
+      lineNumberCharsLengths = map getLineNumberCharsLength elements
       emptyLinePrefix = lineNumberOffset ++ " |"
       renderElement element = case element of
         EmptyLine -> emptyLinePrefix

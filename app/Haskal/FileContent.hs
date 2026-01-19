@@ -34,8 +34,8 @@ nextColumn ptr = ptr {column = prevColumn + 1}
   where
     SourcePtr {column = prevColumn} = ptr
 
-parserInputFromFileContent :: FilePath -> String -> FileContent
-parserInputFromFileContent filePath = go startPosition
+filePathAndSourceCodeToFileContent :: FilePath -> String -> FileContent
+filePathAndSourceCodeToFileContent filePath = go startPosition
   where
     go :: SourcePtr -> String -> FileContent
     go pos [] = Eof pos
@@ -46,3 +46,14 @@ parserInputFromFileContent filePath = go startPosition
         nextPosition _ = nextColumn pos
 
     startPosition = SourcePtr {filePath, lineNumber = 1, column = 1}
+
+getLineText :: Int -> FileContent -> String
+getLineText _ (Eof _) = []
+getLineText lineNumber (Char (SourcePtr {lineNumber = actualLineNumber}) char remaining)
+  | char == '\n' = getLineText lineNumber remaining
+  | actualLineNumber > lineNumber =
+      []
+  | actualLineNumber < lineNumber =
+      getLineText lineNumber remaining
+  | otherwise =
+      char : getLineText lineNumber remaining
