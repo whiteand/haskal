@@ -24,12 +24,14 @@ data Token
   | CloseParens
   | OpenBrackets
   | CloseBrackets
+  | IntegerLiteral String
   | KeywordRecord
   | Colon
   | Comma
   | KeywordType
   | Directive String
   | KeywordEnd
+  | DoubleDot
   | Dot
   deriving (Show)
 
@@ -140,8 +142,10 @@ tokenParser =
   parseIdOrKeyword
     <|> parseSpacesToken
     <|> directiveParser
+    <|> IntegerLiteral <$> integerLiteralStringParser
     <|> exactParser
       [ (";", SemiColon),
+        ("..", DoubleDot),
         (".", Dot),
         ("=", OperatorEqual),
         ("(", OpenParens),
@@ -204,3 +208,20 @@ directiveParser =
     directive <- consumeWhile (/= '}')
     _ <- parseExactChar '}'
     return ("{$" ++ directive ++ "}")
+
+decimalDigitParser :: Parser FileContent ParsingError Char
+decimalDigitParser = parseCharIf isDigit "digit"
+
+integerLiteralStringParser :: Parser FileContent ParsingError String
+integerLiteralStringParser = do
+  digit <- decimalDigitParser
+  if digit == '0'
+    then do
+      input <- inputParser
+      let result = parse decimalDigitParser input
+      case result of
+        Left _ -> return "0"
+        Right _ -> fail "IntegerLiteral cannot start with 0 when it is not zero"
+    else do
+      restDigits <- consumeWhile isDigit
+      return (digit : restDigits)
