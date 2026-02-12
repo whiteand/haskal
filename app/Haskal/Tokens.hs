@@ -20,9 +20,20 @@ data Token
   | TypeLongint
   | KeywordArray
   | OperatorEqual
+  | MultilineComment String
+  | SingleLineComment String
+  | OperatorNotEqual
+  | OperatorMinus
+  | OperatorPlus
+  | OperatorStar
+  | OperatorLessThan
+  | OperatorLessThanOrEqual
+  | OperatorGreaterThan
+  | OperatorGreaterThanOrEqual
   | OpenParens
   | CloseParens
   | OpenBrackets
+  | StringLiteral String
   | CloseBrackets
   | IntegerLiteral String
   | KeywordRecord
@@ -95,8 +106,10 @@ consumeWhile predicate = parseWhile predicate anyCharParser
 
 parseIdString :: Parser FileContent ParsingError String
 parseIdString = do
-  alpha <- parseCharIf isAlpha "alpha character"
-  remaining <- consumeWhile isAlphaNum
+  let isAlphaOrDash x = isAlpha x || x == '_'
+  alpha <- parseCharIf isAlphaOrDash "alpha character"
+  let isAlphaNumOrDash x = isAlphaNum x || x == '_'
+  remaining <- consumeWhile isAlphaNumOrDash
   return (alpha : remaining)
 
 parseExactChar :: Char -> Parser FileContent ParsingError Char
@@ -142,18 +155,29 @@ tokenParser =
   parseIdOrKeyword
     <|> parseSpacesToken
     <|> directiveParser
+    <|> MultilineComment <$> multiLineCommentStringParser
+    <|> SingleLineComment <$> singleLineCommentStringParser
     <|> IntegerLiteral <$> integerLiteralStringParser
+    <|> StringLiteral <$> stringLiteralStringParser
     <|> exactParser
       [ (";", SemiColon),
+        (":", Colon),
         ("..", DoubleDot),
         (".", Dot),
-        ("=", OperatorEqual),
-        ("(", OpenParens),
-        (":", Colon),
-        (")", CloseParens),
         (",", Comma),
+        ("(", OpenParens),
+        (")", CloseParens),
         ("[", OpenBrackets),
-        ("]", CloseBrackets)
+        ("]", CloseBrackets),
+        ("-", OperatorMinus),
+        ("+", OperatorMinus),
+        ("=", OperatorEqual),
+        ("*", OperatorStar),
+        ("<>", OperatorNotEqual),
+        ("<=", OperatorLessThanOrEqual),
+        ("<", OperatorLessThan),
+        (">=", OperatorGreaterThanOrEqual),
+        (">", OperatorGreaterThan)
       ]
     <|> alwaysFail "Unexpected token"
 
@@ -161,7 +185,7 @@ stringToTokensResults :: FilePath -> String -> [Either Diagnostic Token]
 stringToTokensResults filePath sourceCode = mapErrorToDiagnostic <$> parseTokens fileContent
   where
     mapErrorToDiagnostic (Right r) = Right r
-    mapErrorToDiagnostic (Left error) = Left (errorToDiagnostic fileContent error)
+    mapErrorToDiagnostic (Left err) = Left (errorToDiagnostic fileContent err)
 
     fileContent = filePathAndSourceCodeToFileContent filePath sourceCode
     parseTokens :: FileContent -> [Either ParsingError Token]
@@ -225,3 +249,23 @@ integerLiteralStringParser = do
     else do
       restDigits <- consumeWhile isDigit
       return (digit : restDigits)
+
+stringLiteralStringParser :: Parser FileContent ParsingError String
+stringLiteralStringParser = do
+  _ <- parseExactChar '\''
+  content <- consumeWhile (/= '\'')
+  _ <- parseExactChar '\''
+  return content
+
+singleLineCommentStringParser :: Parser FileContent ParsingError String
+singleLineCommentStringParser = do
+  _ <- parseExactChar '/'
+  _ <- parseExactChar '/'
+  consumeWhile (/= '\n')
+
+multiLineCommentStringParser :: Parser FileContent ParsingError String
+multiLineCommentStringParser = do
+  _ <- parseExactChar '{'
+  content <- consumeWhile (/= '}')
+  _ <- parseExactChar '}'
+  return content
