@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad (forM_)
+import Control.Monad
 import Haskal.Tokens
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
@@ -9,13 +9,14 @@ formatFile :: FilePath -> IO ()
 formatFile filePath = do
   content <- readFile filePath
   let tokensResults = stringToTokensResults filePath content
-  forM_ tokensResults handleTokenResult
+  tokenStrings <- concat <$> forM tokensResults handleTokenResult
+  writeFile filePath tokenStrings
   where
     handleTokenResult (Left diagnostic) = do
       print diagnostic
       exitFailure
     handleTokenResult (Right token) =
-      print token
+      return (renderToken token)
 
 formatFiles :: [FilePath] -> IO ()
 formatFiles = mapM_ formatFile

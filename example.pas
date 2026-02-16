@@ -1,14 +1,14 @@
 {$DEFINE SHOULD_LOG_NOT}
 
-Program ChessSolver;
+program ChessSolver;
 
-Uses crt;
+uses crt;
 
-Type 
+type 
   PlayerColor = (PlayerColorWhite, PlayerColorBlack);
   TCmdArgs = 
-             Record
-               ShowHelp: Boolean;
+             record
+               ShowHelp: boolean;
                Fen: string;
                Moves: longint;
                Color: PlayerColor;
@@ -17,18 +17,18 @@ Type
                A1IsAtTheLeftBottomCorner: boolean;
                MovesGroupSize: integer;
                ShowEnemyMoves: boolean;
-             End;
-  Move = Record
+             end;
+  Move = record
     iStart: integer;
     iEnd: integer;
     jStart: integer;
     jEnd: integer;
     figureStart: integer;
     figureEnd: integer;
-  End;
-  mas = array [1..1000] Of Move;
+  end;
+  mas = array [1..1000] of Move;
 
-Const n        = 8;
+const n        = 8;
   peshka   = 1;
   loshad   = 2;
   officer  = 3;
@@ -45,11 +45,11 @@ Const n        = 8;
   black    = -1;
   isLog = false;
 
-Type TBoard = array [1..n, 1..n] Of shortint;
+type TBoard = array [1..n, 1..n] of shortint;
 
-Type TBuffer = array [1..20000] Of string;
+type TBuffer = array [1..20000] of string;
 
-Var cmdArgs: TCmdArgs;
+var cmdArgs: TCmdArgs;
   board: TBoard;
   moves: mas;
   countOfPossibleMoves: longint;
@@ -64,7 +64,7 @@ Var cmdArgs: TCmdArgs;
   orientation: integer;
   lastMakedMoves: mas;
   operator = (a,b:Move)z: boolean;
-Begin
+begin
   Exit(
        (a.iStart = b.iStart) and
   (a.jStart = b.jStart) and
@@ -72,108 +72,108 @@ Begin
   (a.jEnd = b.jEnd) and
   (a.figureStart = b.figureStart)
   );
-End;
+end;
 operator <>(a,b:Move)z: boolean;
-Begin
-  z := Not (a = b);
-End;
+begin
+  z := not (a = b);
+end;
 
-Procedure ShowChessBoard(
-  Var board: TBoard
+procedure ShowChessBoard(
+  var board: TBoard
 );
 
-Const COLOR_WHITE     = 15;
+const COLOR_WHITE     = 15;
   COLOR_BLACK     = 0;
   COLOR_BLUE      = 1;
   COLOR_DARK_GRAY = 8;
 
-Var r: integer;
+var r: integer;
   c: integer;
   cell: longint;
-Begin
-  For r := 1 To n Do
-    Begin
-      For c := 1 To n Do
-        Begin
+begin
+  for r := 1 To n do
+    begin
+      for c := 1 To n do
+        begin
           cell := board[r, c];
-          If (cell = 0) Then
-            Begin
+          if (cell = 0) then
+            begin
               TextColor(COLOR_DARK_GRAY);
-              If ((r + c) Mod 2 = 0)
-                Then write('▫ ')
-              Else write('▪ ');
+              if ((r + c) Mod 2 = 0)
+                then write('▫ ')
+              else write('▪ ');
               TextColor(COLOR_WHITE)
-            End
-          Else Case cell Of 
+            end
+          else Case cell of 
                  bpeshka:
-                      Begin
+                      begin
                         TextColor(Blue);
                         write('♙ ');
                         TextColor(COLOR_WHITE)
-                      End;
+                      end;
                  peshka:
-                         Begin
+                         begin
                            write('♟ ');
-                         End;
+                         end;
                  bladya:
-                         Begin
+                         begin
                            TextColor(Blue);
                            write('♖ ');
                            TextColor(COLOR_WHITE)
-                         End;
+                         end;
                  ladya:
-                        Begin
+                        begin
                           write('♜ ');
-                        End;
+                        end;
                  bloshad:
-                          Begin
+                          begin
                             TextColor(Blue);
                             write('♘ ');
                             TextColor(COLOR_WHITE)
-                          End;
+                          end;
                  loshad:
-                         Begin
+                         begin
                            write('♞ ');
-                         End;
+                         end;
                  officer:
-                          Begin
+                          begin
                             write('♝ ');
-                          End;
+                          end;
                  bofficer:
-                           Begin
+                           begin
                              TextColor(Blue);
                              write('♗ ');
                              TextColor(COLOR_WHITE)
-                           End;
+                           end;
                  ferz:
-                       Begin
+                       begin
                          write('♛ ');
-                       End;
+                       end;
                  bferz:
-                        Begin
+                        begin
                           TextColor(Blue);
                           write('♕ ');
                           TextColor(COLOR_WHITE)
-                        End;
+                        end;
                  korol:
-                        Begin
+                        begin
                           write('♚ ');
-                        End;
+                        end;
                  bkorol:
-                         Begin
+                         begin
                            TextColor(Blue);
                            write('♔ ');
                            TextColor(COLOR_WHITE)
-                         End;
-                 Else write('?');
-            End;
-        End;
+                         end;
+                 else write('?');
+            end;
+        end;
       writeln;
-    End;
-End;
+    end;
+end;
 
-Procedure ShowHelp;
-Begin
+procedure ShowHelp;
+begin
   writeln(
 'Usage: ChessSolver --fen <fen-notation> -o <output-file-path> [--color <white|black>] [--moves <moves>] [--buffer-size <buffer size>] [--a1-at-top-right] [--moves-group-size <group-moves-size>] [--show-enemy-moves]'
   );
@@ -194,10 +194,10 @@ Begin
 '  --moves-group-size - How many moves should be grouped together. Defaults to 0 (means no grouping).'
   );
   writeln('  --show-enemy-moves - Shows enemy moves in the output. Defaults to false.');
-End;
-Function ParseArguments(Var args: TCmdArgs): boolean;
+end;
+function ParseArguments(var args: TCmdArgs): boolean;
 
-Var i: integer;
+var i: integer;
   argument: string;
   expectsFenString: boolean = false;
   expectsMoves: boolean = false;
@@ -209,610 +209,610 @@ Var i: integer;
   outputFileNameProvided: boolean = false;
   bufferSizeProvided: boolean = false;
   code: Shortint;
-Begin
+begin
   args.A1IsAtTheLeftBottomCorner := true;
   args.Color := PlayerColorWhite;
 
-  For i := 1 To ParamCount() Do
-    Begin
+  for i := 1 To ParamCount() do
+    begin
       argument := ParamStr(i);
-      If (argument = '--help') Then
-        Begin
+      if (argument = '--help') then
+        begin
           args.ShowHelp := true;
           Exit(true);
-        End
-      Else If (argument = '--fen') Then expectsFenString := true
-      Else If (expectsFenString) Then
-             Begin
-               If Length(argument) < 15 Then
-                 Begin
+        end
+      else if (argument = '--fen') then expectsFenString := true
+      else if (expectsFenString) then
+             begin
+               if Length(argument) < 15 then
+                 begin
                    ShowHelp;
                    writeln('ERROR: Expected --fen <fen-notation-string>, but ', argument,
                            ' occurred');
                    Exit(false);
-                 End;
+                 end;
             {TODO: Add validation of fen string}
                fenArgumentProvided := true;
                args.Fen := argument;
                expectsFenString := false;
-             End
-      Else If (argument = '--moves') Then expectsMoves := true
-      Else If (expectsMoves) Then
-             Begin
+             end
+      else if (argument = '--moves') then expectsMoves := true
+      else if (expectsMoves) then
+             begin
                Val(argument, args.Moves, code);
-               If code <> 0 Then
-                 Begin
+               if code <> 0 then
+                 begin
                    ShowHelp;
                    writeln('ERROR: Expected --moves <moves-number>, but ', argument, ' is passed');
                    Exit(false);
-                 End;
+                 end;
                expectsMoves := false;
-             End
-      Else If (argument = '-o') Then expectsOutputFileName := true
-      Else If (expectsOutputFileName) Then
-             Begin
-               If Length(argument) <= 0 Then
-                 Begin
+             end
+      else if (argument = '-o') then expectsOutputFileName := true
+      else if (expectsOutputFileName) then
+             begin
+               if Length(argument) <= 0 then
+                 begin
                    ShowHelp;
                    writeln('ERROR: Output file name should not be empty');
                    Exit(false);
-                 End;
+                 end;
                cmdArgs.OutputFileName := argument;
                expectsOutputFileName := false;
                outputFileNameProvided := true;
-             End
-      Else If argument = '--buffer-size' Then expectsBufferSize := true
-      Else If expectsBufferSize Then
-             Begin
+             end
+      else if argument = '--buffer-size' then expectsBufferSize := true
+      else if expectsBufferSize then
+             begin
                Val(argument, args.BufferSize, code);
-               If code <> 0 Then
-                 Begin
+               if code <> 0 then
+                 begin
                    ShowHelp;
                    writeln('ERROR: Expected --buffer-size <buffer-size>, but ', argument,
                            ' is passed');
                    Exit(false);
-                 End;
+                 end;
                expectsBufferSize := false;
-             End
-      Else If argument = '--color' Then expectsColor := true
-      Else If expectsColor Then
-             Begin
-               If argument = 'white' Then args.Color := PlayerColorWhite
-               Else If argument = 'black' Then args.Color := PlayerColorBlack
-               Else
-                 Begin
+             end
+      else if argument = '--color' then expectsColor := true
+      else if expectsColor then
+             begin
+               if argument = 'white' then args.Color := PlayerColorWhite
+               else if argument = 'black' then args.Color := PlayerColorBlack
+               else
+                 begin
                    ShowHelp;
                    writeln('ERROR: Expected --color <black|white>, but ', argument, ' is passed');
                    Exit(false);
-                 End;
+                 end;
                expectsColor := false
-             End
-      Else If argument = '--a1-at-top-right' Then args.A1IsAtTheLeftBottomCorner := false
-      Else If argument = '--show-enemy-moves' Then args.ShowEnemyMoves := true
-      Else If argument = '--moves-group-size' Then expectsMovesGroupSize := true
-      Else If expectsMovesGroupSize Then
-             Begin
+             end
+      else if argument = '--a1-at-top-right' then args.A1IsAtTheLeftBottomCorner := false
+      else if argument = '--show-enemy-moves' then args.ShowEnemyMoves := true
+      else if argument = '--moves-group-size' then expectsMovesGroupSize := true
+      else if expectsMovesGroupSize then
+             begin
                Val(argument, args.MovesGroupSize, code);
-               If code <> 0 Then
-                 Begin
+               if code <> 0 then
+                 begin
                    ShowHelp;
                    writeln('ERROR: Expected --moves-group-size <group size>, but ', argument,
                            ' is passed');
                    Exit(false);
-                 End;
+                 end;
                expectsMovesGroupSize := false;
-             End;
-    End;
-  If expectsFenString Or Not fenArgumentProvided Then
-    Begin
+             end;
+    end;
+  if expectsFenString Or not fenArgumentProvided then
+    begin
       ShowHelp;
       writeln('ERROR: Expected --fen <fen-notation-string>, but nothing is passed');
       Exit(false);
-    End;
-  If expectsOutputFileName Or Not outputFileNameProvided Then
-    Begin
+    end;
+  if expectsOutputFileName Or not outputFileNameProvided then
+    begin
       ShowHelp;
       writeln('ERROR: Expected -o <output file path>, but nothing is passed');
       Exit(false);
-    End;
-  If expectsMoves Then
-    Begin
+    end;
+  if expectsMoves then
+    begin
       ShowHelp;
       writeln('ERROR: Expected --steps <steps-count>, but nothing is passed');
       Exit(false);
-    End;
-  If expectsColor Then
-    Begin
+    end;
+  if expectsColor then
+    begin
       ShowHelp;
       writeln('ERROR: Expected --color <white|black>, but nothing is passed');
       Exit(false);
-    End;
-  If expectsBufferSize Then
-    Begin
+    end;
+  if expectsBufferSize then
+    begin
       ShowHelp;
       writeln('ERROR: Expected --buffer-size <buffer-size>, but nothing is passed');
       Exit(false);
-    End;
-  If expectsMovesGroupSize Then
-    Begin
+    end;
+  if expectsMovesGroupSize then
+    begin
       ShowHelp;
       writeln('ERROR: Expected --moves-group-size <group size>, but nothing is passed');
       Exit(false);
-    End;
-  If Not bufferSizeProvided Then args.BufferSize := 10000;
+    end;
+  if not bufferSizeProvided then args.BufferSize := 10000;
   Exit(true);
-End;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Procedure findKorol(color: longint; Var i0,j0: longint);
+procedure findKorol(color: longint; var i0,j0: longint);
 
-Var i,j: longint;
-Begin
-  For i:=1 To n Do
-    Begin
-      For j:=1 To n Do
-        Begin
-          If board[i,j] = korol*color Then
-            Begin
+var i,j: longint;
+begin
+  for i:=1 To n do
+    begin
+      for j:=1 To n do
+        begin
+          if board[i,j] = korol*color then
+            begin
               i0 := i;
               j0 := j;
               Exit();
-            End;
-        End;
-    End;
-End;
+            end;
+        end;
+    end;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Procedure MakeBoardWithFen(Var board: TBoard; s:String);
+procedure MakeBoardWithFen(var board: TBoard; s:string);
 
-Var k,z,i,j: integer;
-Procedure next;
-Begin
+var k,z,i,j: integer;
+procedure next;
+begin
   j := j+1;
-  If (j>8) Then
-    Begin
+  if (j>8) then
+    begin
       j := 1;
       i := i-1;
-    End;
-End;
-Begin
+    end;
+end;
+begin
   i := 8;
   j := 1;
-  For k:=1 To length(s) Do
-    Begin
-      If (s[k]<>'') And (s[k]<>'/') Then
-        Begin
-          If (s[k] In ['1'..'8']) Then
-            Begin
-              For z:=1 To ord(s[k]) - ord('0') Do
-                Begin
+  for k:=1 To length(s) do
+    begin
+      if (s[k]<>'') And (s[k]<>'/') then
+        begin
+          if (s[k] In ['1'..'8']) then
+            begin
+              for z:=1 To ord(s[k]) - ord('0') do
+                begin
                   board[i,j] := 0;
                   next;
-                End;
-            End
-          Else
-            If (s[k] = 'K') Then
-              Begin
+                end;
+            end
+          else
+            if (s[k] = 'K') then
+              begin
                 board[i,j] := 6;
                 next;
-              End
-          Else
-            If (s[k] = 'Q') Then
-              Begin
+              end
+          else
+            if (s[k] = 'Q') then
+              begin
                 board[i,j] := 5;
                 next;
-              End
-          Else
-            If (s[k] = 'R') Then
-              Begin
+              end
+          else
+            if (s[k] = 'R') then
+              begin
                 board[i,j] := 4;
                 next;
-              End
-          Else
-            If (s[k] = 'B') Then
-              Begin
+              end
+          else
+            if (s[k] = 'B') then
+              begin
                 board[i,j] := 3;
                 next;
-              End
-          Else
-            If (s[k] = 'N') Then
-              Begin
+              end
+          else
+            if (s[k] = 'N') then
+              begin
                 board[i,j] := 2;
                 next;
-              End
-          Else
-            If (s[k] = 'P') Then
-              Begin
+              end
+          else
+            if (s[k] = 'P') then
+              begin
                 board[i,j] := 1;
                 next;
-              End
-          Else
-            If (s[k] = 'k') Then
-              Begin
+              end
+          else
+            if (s[k] = 'k') then
+              begin
                 board[i,j] := -6;
                 next;
-              End
-          Else
-            If (s[k] = 'q') Then
-              Begin
+              end
+          else
+            if (s[k] = 'q') then
+              begin
                 board[i,j] := -5;
                 next;
-              End
-          Else
-            If (s[k] = 'r') Then
-              Begin
+              end
+          else
+            if (s[k] = 'r') then
+              begin
                 board[i,j] := -4;
                 next;
-              End
-          Else
-            If (s[k] = 'b') Then
-              Begin
+              end
+          else
+            if (s[k] = 'b') then
+              begin
                 board[i,j] := -3;
                 next;
-              End
-          Else
-            If (s[k] = 'n') Then
-              Begin
+              end
+          else
+            if (s[k] = 'n') then
+              begin
                 board[i,j] := -2;
                 next;
-              End
-          Else
-            If (s[k] = 'p') Then
-              Begin
+              end
+          else
+            if (s[k] = 'p') then
+              begin
                 board[i,j] := -1;
                 next;
-              End;
-        End;
-    End;
+              end;
+        end;
+    end;
 
-End;
-Procedure ReverseColors(Var board: TBoard);
+end;
+procedure ReverseColors(var board: TBoard);
 
-Var i, j: shortint;
-Begin
-  For i:=1 To 8 Do
-    Begin
-      For j:=1 To 8 Do
-        Begin
+var i, j: shortint;
+begin
+  for i:=1 To 8 do
+    begin
+      for j:=1 To 8 do
+        begin
           board[i,j] := -board[i,j];
-        End;
-    End;
-End;
-Procedure ClearBoard(Var board: TBoard);
+        end;
+    end;
+end;
+procedure ClearBoard(var board: TBoard);
 
-Var i,j: integer;
-Begin
-  For i:=1 To n Do
-    Begin
-      For j:=1 To n Do
-        Begin
+var i,j: integer;
+begin
+  for i:=1 To n do
+    begin
+      for j:=1 To n do
+        begin
           board[i,j] := 0;
-        End;
-    End;
-End;
-Procedure Initialize(Var cmdArgs: TCmdArgs; Var board: TBoard);
+        end;
+    end;
+end;
+procedure Initialize(var cmdArgs: TCmdArgs; var board: TBoard);
 
-Var outputFile: text;
-Begin
+var outputFile: text;
+begin
   clrscr;
   ClearBoard(board);
   cmdArgs.Moves := 1;
-  If Not ParseArguments(cmdArgs) Then Halt(1);
-  If cmdArgs.ShowHelp Then
-    Begin
+  if not ParseArguments(cmdArgs) then Halt(1);
+  if cmdArgs.ShowHelp then
+    begin
       ShowHelp;
       Halt(0);
-    End;
+    end;
   writeln('Moves: ', cmdArgs.Moves);
   writeln('Color: ', cmdArgs.Color);
   makeBoardWithFen(board, cmdArgs.fen);
-  If cmdArgs.Color = PlayerColorBlack Then ReverseColors(board);
+  if cmdArgs.Color = PlayerColorBlack then ReverseColors(board);
   countOfPossibleMoves := 0;
-  If cmdArgs.A1IsAtTheLeftBottomCorner Then orientation := -1
-  Else orientation := 1;
+  if cmdArgs.A1IsAtTheLeftBottomCorner then orientation := -1
+  else orientation := 1;
   assign(outputFile, cmdArgs.OutputFileName);
   rewrite(outputFile);
   close(outputFile);
-End;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Function colorOf(f: integer): integer;
-Begin
-  If f > 0 Then Exit(1)
-  Else If f < 0 Then Exit(-1)
-  Else Exit(0)
-End;
-Function getFigureOn(i,j: longint): longint;
-Begin
-  If (i>=1) And (i<=n) And (j>=1) And (j<=n) Then
-    Begin
+function colorOf(f: integer): integer;
+begin
+  if f > 0 then Exit(1)
+  else if f < 0 then Exit(-1)
+  else Exit(0)
+end;
+function getFigureOn(i,j: longint): longint;
+begin
+  if (i>=1) And (i<=n) And (j>=1) And (j<=n) then
+    begin
       getFigureOn := board[i,j];
-    End
-  Else
-    Begin
+    end
+  else
+    begin
       getFigureOn := 0;
-    End;
-End;
+    end;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Function searchTo(i0,j0,dn,dm: longint): longint;
+function searchTo(i0,j0,dn,dm: longint): longint;
 
-Var i,j: longint;
+var i,j: longint;
   current: longint;
-Begin
+begin
   i := i0 + dn;
   j := j0 + dm;
 
-  While (i<=n) And (i>=1) And (j<=n) And (j>=1) Do
-    Begin
+  While (i<=n) And (i>=1) And (j<=n) And (j>=1) do
+    begin
       current := getFigureOn(i,j);
-      If current <> 0 Then Exit(current);
+      if current <> 0 then Exit(current);
       i := i + dn;
       j := j + dm;
-    End;
+    end;
   Exit(0);
-End;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Function isUnderAttackByFigure(figure, i0, j0: longint): boolean;
+function isUnderAttackByFigure(figure, i0, j0: longint): boolean;
 
-Var res: boolean;
-Begin
+var res: boolean;
+begin
   res := false;
-  If (abs(figure) = peshka) Then
-    Begin
-      If (figure*orientation > 0) Then
-        Begin
-          If (getFigureOn(i0+1,j0+1) = figure) Or (getFigureOn(i0+1,j0-1) = figure) Then
-            Begin
+  if (abs(figure) = peshka) then
+    begin
+      if (figure*orientation > 0) then
+        begin
+          if (getFigureOn(i0+1,j0+1) = figure) Or (getFigureOn(i0+1,j0-1) = figure) then
+            begin
               res := true;
-            End;
-        End
-      Else
-        Begin
-          If (getFigureOn(i0-1,j0+1) = figure) Or (getFigureOn(i0-1,j0-1) = figure) Then
-            Begin
+            end;
+        end
+      else
+        begin
+          if (getFigureOn(i0-1,j0+1) = figure) Or (getFigureOn(i0-1,j0-1) = figure) then
+            begin
               res := true;
-            End;
-        End;
-    End
-  Else
-    If (abs(figure) = loshad) Then
-      Begin
-        If ((getFigureOn(i0-2,j0-1) = figure) Or
+            end;
+        end;
+    end
+  else
+    if (abs(figure) = loshad) then
+      begin
+        if ((getFigureOn(i0-2,j0-1) = figure) Or
            (getFigureOn(i0-2,j0+1) = figure) Or
            (getFigureOn(i0+2,j0-1) = figure) Or
            (getFigureOn(i0+2,j0+1) = figure) Or
            (getFigureOn(i0-1,j0-2) = figure) Or
            (getFigureOn(i0-1,j0+2) = figure) Or
            (getFigureOn(i0+1,j0-2) = figure) Or
-           (getFigureOn(i0+1,j0+2) = figure)) Then
-          Begin
+           (getFigureOn(i0+1,j0+2) = figure)) then
+          begin
             res := true;
-          End
-      End
-  Else
-    If (abs(figure) = officer) Then
-      Begin
-        If (searchTo(i0,j0,-1,-1) = figure) Then
-          Begin
+          end
+      end
+  else
+    if (abs(figure) = officer) then
+      begin
+        if (searchTo(i0,j0,-1,-1) = figure) then
+          begin
             //To The left top
             res := true;
-          End
-        Else If (searchTo(i0,j0,-1,1) = figure) Then
-               Begin
+          end
+        else if (searchTo(i0,j0,-1,1) = figure) then
+               begin
                  //To The right Top
                  res := true;
-               End
-        Else If (searchTo(i0,j0,1,-1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,1,-1) = figure) then
+               begin
                  //To the left bottom
                  res := true;
-               End
-        Else If (searchTo(i0,j0,1,1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,1,1) = figure) then
+               begin
                  //to the right bottom
                  res := true;
-               End;
+               end;
 
-      End
-  Else
-    If (abs(figure) = ladya) Then
-      Begin
+      end
+  else
+    if (abs(figure) = ladya) then
+      begin
         //Search
-        If (searchTo(i0,j0,-1,0) = figure) Then
-          Begin
+        if (searchTo(i0,j0,-1,0) = figure) then
+          begin
             res := true;
-          End
-        Else If (searchTo(i0,j0,1,0) = figure) Then
-               Begin
+          end
+        else if (searchTo(i0,j0,1,0) = figure) then
+               begin
                  res := true;
-               End
-        Else If (searchTo(i0,j0,0,-1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,0,-1) = figure) then
+               begin
                  res := true;
-               End
-        Else If (searchTo(i0,j0,0,1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,0,1) = figure) then
+               begin
                  res := true;
-               End;
+               end;
 
-      End
-  Else
-    If (abs(figure) = ferz) Then
-      Begin
+      end
+  else
+    if (abs(figure) = ferz) then
+      begin
         //Search
-        If (searchTo(i0,j0,-1,-1) = figure) Then
-          Begin
+        if (searchTo(i0,j0,-1,-1) = figure) then
+          begin
             res := true;
-          End
-        Else If (searchTo(i0,j0,-1,0) = figure) Then
-               Begin
+          end
+        else if (searchTo(i0,j0,-1,0) = figure) then
+               begin
                  res := true;
-               End
-        Else If (searchTo(i0,j0,-1,1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,-1,1) = figure) then
+               begin
                  res := true;
-               End
-        Else If (searchTo(i0,j0,0,1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,0,1) = figure) then
+               begin
                  res := true;
-               End
-        Else If (searchTo(i0,j0,1,1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,1,1) = figure) then
+               begin
                  res := true;
-               End
-        Else If (searchTo(i0,j0,1,0) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,1,0) = figure) then
+               begin
                  res := true;
-               End
-        Else If (searchTo(i0,j0,1,-1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,1,-1) = figure) then
+               begin
                  res := true;
-               End
-        Else If (searchTo(i0,j0,0,-1) = figure) Then
-               Begin
+               end
+        else if (searchTo(i0,j0,0,-1) = figure) then
+               begin
                  res := true;
-               End;
-      End
-  Else
-    If (abs(figure) = korol) Then
-      Begin
-        If ((getFigureOn(i0-1,j0-1) = figure) Or
+               end;
+      end
+  else
+    if (abs(figure) = korol) then
+      begin
+        if ((getFigureOn(i0-1,j0-1) = figure) Or
            (getFigureOn(i0-1,j0) = figure) Or
            (getFigureOn(i0-1,j0+1) = figure) Or
            (getFigureOn(i0,j0-1) = figure) Or
            (getFigureOn(i0,j0+1) = figure) Or
            (getFigureOn(i0+1,j0-1) = figure) Or
            (getFigureOn(i0+1,j0) = figure) Or
-           (getFigureOn(i0+1,j0+1) = figure)) Then
-          Begin
+           (getFigureOn(i0+1,j0+1) = figure)) then
+          begin
             res := true;
-          End
-      End;
+          end
+      end;
   isUnderAttackByFigure := res;
-End;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Function isUnderAttackBy(colorOfattacker, i0, j0: longint): boolean;
+function isUnderAttackBy(colorOfattacker, i0, j0: longint): boolean;
 
-Var res: boolean;
-Begin
-  If isUnderAttackByFigure(peshka * colorOfattacker, i0, j0) Then Exit(true);
-  If isUnderAttackByFigure(loshad * colorOfattacker, i0, j0) Then Exit(true);
-  If isUnderAttackByFigure(officer * colorOfattacker, i0, j0) Then Exit(true);
-  If isUnderAttackByFigure(ladya * colorOfattacker, i0, j0) Then Exit(true);
-  If isUnderAttackByFigure(ferz * colorOfattacker, i0, j0) Then Exit(true);
-  If isUnderAttackByFigure(korol * colorOfattacker, i0, j0) Then Exit(true);
+var res: boolean;
+begin
+  if isUnderAttackByFigure(peshka * colorOfattacker, i0, j0) then Exit(true);
+  if isUnderAttackByFigure(loshad * colorOfattacker, i0, j0) then Exit(true);
+  if isUnderAttackByFigure(officer * colorOfattacker, i0, j0) then Exit(true);
+  if isUnderAttackByFigure(ladya * colorOfattacker, i0, j0) then Exit(true);
+  if isUnderAttackByFigure(ferz * colorOfattacker, i0, j0) then Exit(true);
+  if isUnderAttackByFigure(korol * colorOfattacker, i0, j0) then Exit(true);
 
   Exit(false)
-End;
-Procedure saveBoard;
+end;
+procedure saveBoard;
 
-Var f: text;
+var f: text;
   i,j: longint;
-Begin
+begin
   assign(f,'out.txt');
   append(f);
-  For i:=1 To n Do
-    Begin
-      For j:=1 To n Do
-        Begin
+  for i:=1 To n do
+    begin
+      for j:=1 To n do
+        begin
           write(f, board[i,j]:3);
-        End;
+        end;
       writeln(f);
-    End;
+    end;
   writeln(f);
   close(f);
-End;
-Function figureTOSTR(f: longint): string;
+end;
+function figureTOSTR(f: longint): string;
 
-Var res: string;
-Begin
+var res: string;
+begin
   res := ' ';
-  If (abs(f) = peshka) Then res := ' peshka';
-  If (abs(f) = loshad) Then res := ' loshad';
-  If (abs(f) = officer) Then res := ' officer';
-  If (abs(f) = ladya) Then res := ' ladya';
-  If (abs(f) = ferz) Then res := ' ferz';
-  If (abs(f) = korol) Then res := ' korol';
-  If (f<0) Then res[1] := 'b'
-  Else res[1] := 'w';
+  if (abs(f) = peshka) then res := ' peshka';
+  if (abs(f) = loshad) then res := ' loshad';
+  if (abs(f) = officer) then res := ' officer';
+  if (abs(f) = ladya) then res := ' ladya';
+  if (abs(f) = ferz) then res := ' ferz';
+  if (abs(f) = korol) then res := ' korol';
+  if (f<0) then res[1] := 'b'
+  else res[1] := 'w';
   figuretoSTR := res;
-End;
-Function getCoordStr(i,j: longint): string;
+end;
+function getCoordStr(i,j: longint): string;
 
-Var res: string;
-Begin
+var res: string;
+begin
   str(i, res);
   Exit(chr(ord('a') + j - 1) + res)
-End;
-Function MoveToStr(m:Move): string;
-Begin
+end;
+function MoveToStr(m:Move): string;
+begin
   Exit(
        figureToStr(m.figureStart) + ' '
   + getCoordStr(m.iStart, m.jStart) + ' '
   + getCoordStr(m.iEnd, m.jEnd)
   )
-End;
-Procedure savebuf(Var buffer: TBuffer; Var buffercursor: longint; outputFileName: String);
+end;
+procedure savebuf(var buffer: TBuffer; var buffercursor: longint; outputFileName: string);
 
-Var f: text;
+var f: text;
   i: longint;
-Begin
+begin
   assign(f, outputFileName);
   append(f);
-  For i:=1 To buffercursor Do
-    Begin
+  for i:=1 To buffercursor do
+    begin
       writeln(f,buffer[i]);
-    End;
+    end;
   close(f);
   buffercursor := 0;
-End;
-Procedure AddStrToBuffer(Var buffer: TBuffer; Var buffercursor: longint; s: String);
-Begin
+end;
+procedure AddStrToBuffer(var buffer: TBuffer; var buffercursor: longint; s: string);
+begin
   inc(buffercursor);
   buffer[buffercursor] := s;
-End;
-Procedure saveMoves(
-                    outputFileName: String;
-                    Var buffer: TBuffer;
-                    Var buffercursor: longint;
+end;
+procedure saveMoves(
+                    outputFileName: string;
+                    var buffer: TBuffer;
+                    var buffercursor: longint;
                     buffermax: longint;
                     showEnemyMoves: boolean;
                     movesGroupSize: longint
 );
 
-Var i: longint;
+var i: longint;
   s: string;
-Begin
+begin
   i := 1;
   s := '';
-  For i:=1 To countOfMakedMoves Do
-    Begin
-      If (i<=movesGroupSize) Then
-        Begin
-          If (lastMakedMoves[i] <> MakedMoves[i]) Then AddStrToBuffer(buffer, buffercursor, '');
-        End;
-    End;
-  For i:=1 To countOfMakedMoves Do
-    Begin
-      If (i Mod 2 = 1) Or showEnemyMoves Then
-        Begin
+  for i:=1 To countOfMakedMoves do
+    begin
+      if (i<=movesGroupSize) then
+        begin
+          if (lastMakedMoves[i] <> MakedMoves[i]) then AddStrToBuffer(buffer, buffercursor, '');
+        end;
+    end;
+  for i:=1 To countOfMakedMoves do
+    begin
+      if (i Mod 2 = 1) Or showEnemyMoves then
+        begin
           s := s + MoveToSTr(makedmoves[i])+chr(9)
-        End;
-    End;
+        end;
+    end;
   AddStrToBuffer(buffer, buffercursor, s);
-  If (buffercursor >= buffermax) Then
-    Begin
+  if (buffercursor >= buffermax) then
+    begin
       savebuf(buffer, buffercursor, outputFileName);
-    End;
+    end;
   lastMakedMoves := makedmoves;
-End;
+end;
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Function CreateMove(
+function CreateMove(
                     iStart: longint;
                     jStart: longint;
                     iEnd: longint;
@@ -820,8 +820,8 @@ Function CreateMove(
                     figureStart: longint
 ): Move;
 
-Var res: Move;
-Begin
+var res: Move;
+begin
   res.iStart := iStart;
   res.jStart := jStart;
   res.iEnd := iEnd;
@@ -829,228 +829,228 @@ Begin
   res.figureStart := figureStart;
   res.figureEnd := 0;
   CreateMove := res;
-End;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Procedure DoMove(Var m: Move);
-Begin
-  With m Do
-    Begin
+procedure DoMove(var m: Move);
+begin
+  With m do
+    begin
       figureEnd := board[iEnd, jEnd];
-      If (iEnd = 1) And (figureStart*orientation = peshka) Then
-        Begin
+      if (iEnd = 1) And (figureStart*orientation = peshka) then
+        begin
           board[iEnd,jEnd] := ferz*colorOf(figureStart);
-        End
-      Else If (iEnd = 8) And (figureStart*orientation = bpeshka) Then
-             Begin
+        end
+      else if (iEnd = 8) And (figureStart*orientation = bpeshka) then
+             begin
                board[iEnd,jEnd] := ferz*colorOf(figureStart);
-             End
-      Else board[iEnd, jEnd] := figureStart;
+             end
+      else board[iEnd, jEnd] := figureStart;
 
       board[iStart, jStart] := 0;
       inc(countOfMakedMoves);
       MakedMoves[countOfMakedMoves] := m;
-    End;
-End;
+    end;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Procedure UndoMove(Var m: Move);
-Begin
-  With m Do
-    Begin
+procedure UndoMove(var m: Move);
+begin
+  With m do
+    begin
       board[iStart, jStart] := figureStart;
       board[iEnd, jEnd] := figureEnd;
       dec(countOfMakedMoves);
-    End;
-End;
+    end;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Function isCheckTo(color: longint): boolean;
+function isCheckTo(color: longint): boolean;
 //TOWRITE
 
-Var res: boolean;
+var res: boolean;
   i,j: longint;
-Begin
+begin
   findKorol(color,i,j);
   res := isUnderAttackBy(-color, i,j);
   isCheckTo := res;
-End;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Procedure AddMove(m: Move);
-Begin
-  If (m.iEnd>=1) And (m.iEnd<=8) And (m.jEnd>=1) And (m.jEnd<=8) Then
-    Begin
+procedure AddMove(m: Move);
+begin
+  if (m.iEnd>=1) And (m.iEnd<=8) And (m.jEnd>=1) And (m.jEnd<=8) then
+    begin
       doMove(m);
-      If (Not isCheckTo(colorOf(m.figureStart))) And (colorOf(m.figurestart)<>colorOf(m.figureEnd))
-        Then
-        Begin
+      if (not isCheckTo(colorOf(m.figureStart))) And (colorOf(m.figurestart)<>colorOf(m.figureEnd))
+        then
+        begin
           inc(countOfPossibleMoves);
           moves[countOfPossibleMoves] := m;
-        End;
+        end;
       UndoMove(m);
-    End;
-End;
-Procedure AddMovesDist(i0,j0,dn,dm: longint);
+    end;
+end;
+procedure AddMovesDist(i0,j0,dn,dm: longint);
 
-Var i,j: longint;
+var i,j: longint;
   currentfigure: longint;
   current: longint;
   curmov: Move;
-Begin
+begin
   i := i0 + dn;
   j := j0 + dm;
   currentFigure := getFigureOn(i0,j0);
   current := getFigureOn(i,j);
-  If (dn <> 0) Or (dm <> 0) Then
-    Begin
-      While (current*currentFigure <= 0) And (i<=n) And (i>=1) And (j<=n) And (j>=1) Do
-        Begin
+  if (dn <> 0) Or (dm <> 0) then
+    begin
+      While (current*currentFigure <= 0) And (i<=n) And (i>=1) And (j<=n) And (j>=1) do
+        begin
           curmov := CreateMove(i0,j0,i,j, currentFigure);
           addMove(curmov);
-          If (current*currentFigure < 0) Then break;
+          if (current*currentFigure < 0) then break;
           i := i + dn;
           j := j + dm;
           current := getFigureOn(i,j);
 
-        End;
-    End;
-End;
-Procedure AddAllPossibleMoves(color: longint);
+        end;
+    end;
+end;
+procedure AddAllPossibleMoves(color: longint);
 //TOWRITE
 
-Var i,j: longint;
+var i,j: longint;
   curfig: longint;
   // Curent Figure
   curmov: Move;
-Begin
-  For i:=1 To n Do
-    Begin
-      For j:=1 To n Do
-        Begin
-          If (board[i,j]*color > 0) Then
-            Begin
+begin
+  for i:=1 To n do
+    begin
+      for j:=1 To n do
+        begin
+          if (board[i,j]*color > 0) then
+            begin
               curfig := board[i,j];
-              If (abs(curfig) = peshka) Then
-                Begin
-                  If (color*orientation = white) Then
-                    Begin
-                      If (getFigureOn(i-1,j-1)*color<0) Then
-                        Begin
+              if (abs(curfig) = peshka) then
+                begin
+                  if (color*orientation = white) then
+                    begin
+                      if (getFigureOn(i-1,j-1)*color<0) then
+                        begin
                           curmov := CreateMove(i,j,i-1,j-1, curfig);
                           AddMove(curMov);
-                        End;
-                      If (getFigureOn(i-1,j+1)*color<0) Then
-                        Begin
+                        end;
+                      if (getFigureOn(i-1,j+1)*color<0) then
+                        begin
                           curmov := CreateMove(i,j,i-1,j+1, curfig);
                           AddMove(curMov);
-                        End;
-                      If (getFigureOn(i-1,j) = 0) Then
-                        Begin
+                        end;
+                      if (getFigureOn(i-1,j) = 0) then
+                        begin
                           curmov := CreateMove(i,j,i-1,j, curfig);
                           AddMove(curMov);
-                        End;
-                      If (i = 7) Then
-                        Begin
-                          If (getFigureOn(i-2,j) = 0) Then
-                            Begin
+                        end;
+                      if (i = 7) then
+                        begin
+                          if (getFigureOn(i-2,j) = 0) then
+                            begin
                               curmov := CreateMove(i,j,i-2,j, curfig);
                               AddMove(curMov);
-                            End;
-                        End;
-                    End
-                  Else
-                    Begin
-                      If (getFigureOn(i+1,j-1)*color<0) Then
-                        Begin
+                            end;
+                        end;
+                    end
+                  else
+                    begin
+                      if (getFigureOn(i+1,j-1)*color<0) then
+                        begin
                           curmov := CreateMove(i,j,i+1,j-1, curfig);
                           AddMove(curMov);
-                        End;
-                      If (getFigureOn(i+1,j+1)*color<0) Then
-                        Begin
+                        end;
+                      if (getFigureOn(i+1,j+1)*color<0) then
+                        begin
                           curmov := CreateMove(i,j,i+1,j+1, curfig);
                           AddMove(curMov);
-                        End;
-                      If (getFigureOn(i+1,j) = 0) Then
-                        Begin
+                        end;
+                      if (getFigureOn(i+1,j) = 0) then
+                        begin
                           curmov := CreateMove(i,j,i+1,j, curfig);
                           AddMove(curMov);
-                        End;
-                      If (i = 2) Then
-                        Begin
-                          If (getFigureOn(i+2,j) = 0) Then
-                            Begin
+                        end;
+                      if (i = 2) then
+                        begin
+                          if (getFigureOn(i+2,j) = 0) then
+                            begin
                               curmov := CreateMove(i,j,i+2,j, curfig);
                               AddMove(curMov);
-                            End;
-                        End;
-                    End;
-                End
-              Else
-                If (abs(curfig) = loshad) Then
+                            end;
+                        end;
+                    end;
+                end
+              else
+                if (abs(curfig) = loshad) then
                   //-----------------------------------------------------Loshad
-                  Begin
-                    If (getFigureOn(i-2,j-1)*color <= 0) Then
-                      Begin
+                  begin
+                    if (getFigureOn(i-2,j-1)*color <= 0) then
+                      begin
                         curmov := CreateMove(i,j,i-2,j-1, curfig);
                         AddMove(curMov);
-                      End;
-                    If (getFigureOn(i-2,j+1)*color <= 0) Then
-                      Begin
+                      end;
+                    if (getFigureOn(i-2,j+1)*color <= 0) then
+                      begin
                         curmov := CreateMove(i,j,i-2,j+1, curfig);
                         AddMove(curMov);
-                      End;
-                    If (getFigureOn(i+2,j-1)*color <= 0) Then
-                      Begin
+                      end;
+                    if (getFigureOn(i+2,j-1)*color <= 0) then
+                      begin
                         curmov := CreateMove(i,j,i+2,j-1, curfig);
                         AddMove(curMov);
-                      End;
-                    If (getFigureOn(i+2,j+1)*color <= 0) Then
-                      Begin
+                      end;
+                    if (getFigureOn(i+2,j+1)*color <= 0) then
+                      begin
                         curmov := CreateMove(i,j,i+2,j+1, curfig);
                         AddMove(curMov);
-                      End;
+                      end;
 
-                    If (getFigureOn(i-1,j-2)*color <= 0) Then
-                      Begin
+                    if (getFigureOn(i-1,j-2)*color <= 0) then
+                      begin
                         curmov := CreateMove(i,j,i-1,j-2, curfig);
                         AddMove(curMov);
-                      End;
-                    If (getFigureOn(i-1,j+2)*color <= 0) Then
-                      Begin
+                      end;
+                    if (getFigureOn(i-1,j+2)*color <= 0) then
+                      begin
                         curmov := CreateMove(i,j,i-1,j+2, curfig);
                         AddMove(curMov);
-                      End;
-                    If (getFigureOn(i+1,j-2)*color <= 0) Then
-                      Begin
+                      end;
+                    if (getFigureOn(i+1,j-2)*color <= 0) then
+                      begin
                         curmov := CreateMove(i,j,i+1,j-2, curfig);
                         AddMove(curMov);
-                      End;
-                    If (getFigureOn(i+1,j+2)*color <= 0) Then
-                      Begin
+                      end;
+                    if (getFigureOn(i+1,j+2)*color <= 0) then
+                      begin
                         curmov := CreateMove(i,j,i+1,j+2, curfig);
                         AddMove(curMov);
-                      End;
-                  End
-              Else
-                If (abs(curfig) = officer) Then
-                  Begin
+                      end;
+                  end
+              else
+                if (abs(curfig) = officer) then
+                  begin
                     addmovesDist(i,j,-1,-1);
                     addmovesDist(i,j,-1, 1);
                     addmovesDist(i,j, 1,-1);
                     addmovesDist(i,j, 1, 1);
-                  End
-              Else
-                If (abs(curfig) = ladya) Then
-                  Begin
+                  end
+              else
+                if (abs(curfig) = ladya) then
+                  begin
                     addmovesDist(i,j,-1, 0);
                     addmovesDist(i,j, 0, 1);
                     addmovesDist(i,j, 1, 0);
                     addmovesDist(i,j, 0,-1);
-                  End
-              Else
-                If (abs(curfig) = ferz) Then
-                  Begin
+                  end
+              else
+                if (abs(curfig) = ferz) then
+                  begin
                     addmovesDist(i,j,-1,-1);
                     addmovesDist(i,j,-1, 1);
                     addmovesDist(i,j, 1,-1);
@@ -1059,10 +1059,10 @@ Begin
                     addmovesDist(i,j, 0, 1);
                     addmovesDist(i,j, 1, 0);
                     addmovesDist(i,j, 0,-1);
-                  End
-              Else
-                If (abs(curfig) = korol) Then
-                  Begin
+                  end
+              else
+                if (abs(curfig) = korol) then
+                  begin
                     curmov := CreateMove(i,j,i-1,j-1, curfig);
                     AddMove(curmov);
                     curmov := CreateMove(i,j,i-1,j,   curfig);
@@ -1079,31 +1079,31 @@ Begin
                     AddMove(curmov);
                     curmov := CreateMove(i,j,i+1,j+1, curfig);
                     AddMove(curmov);
-                  End;
-            End;
-        End;
-    End;
-End;
+                  end;
+            end;
+        end;
+    end;
+end;
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-Procedure Solve(
+procedure Solve(
                 color, countOfMoves: longint;
-                Var buffer: TBuffer;
-                Var buffercursor: longint;
+                var buffer: TBuffer;
+                var buffercursor: longint;
                 buffermax: longint;
                 movesGroupSize: longint;
                 showEnemyMoves: boolean;
-                outputFileName: String
+                outputFileName: string
 );
 
-Var FirstPossibleMoveIndex: longint;
+var FirstPossibleMoveIndex: longint;
   LastPossibleMoveIndex: longint;
   i: longint;
   checkWhite, checkBlack: boolean;
   isOk: boolean;
-Begin
-  If (countOfMoves > 0) Then
-    Begin
+begin
+  if (countOfMoves > 0) then
+    begin
       inc(cVariants);
       FirstPossibleMoveIndex := countOfPossibleMoves + 1;
 
@@ -1112,19 +1112,19 @@ Begin
       checkWhite := isCheckTo(white);
       checkBlack := isCheckTo(black);
 
-      If (checkWhite) And (isCheckToWhite) Then isOk := false;
-      If (checkBlack) And (isCheckToBlack) Then isOK := false;
+      if (checkWhite) And (isCheckToWhite) then isOk := false;
+      if (checkBlack) And (isCheckToBlack) then isOK := false;
 
-      If (isOk) Then
-        Begin
+      if (isOk) then
+        begin
           isCheckToWhite := checkWhite;
           isCheckToBlack := checkBlack;
           AddAllPossibleMoves(color);
           LastPossibleMoveIndex := countOfPossibleMoves;
-          If (LastPossibleMoveIndex < FirstPossibleMoveIndex) And (isCheckTo(black)) Then
-            Begin
+          if (LastPossibleMoveIndex < FirstPossibleMoveIndex) And (isCheckTo(black)) then
+            begin
               inc(cSolving);
-              If (maxcountOfPossiblemoves < countofPossibleMoves) Then maxcountofPossibleMoves := 
+              if (maxcountOfPossiblemoves < countofPossibleMoves) then maxcountofPossibleMoves := 
                                                                                 countOfPossibleMoves
               ;
               Writeln('solved: ', cSolving, ' Solve: ', cVariants, '   max: ',
@@ -1132,10 +1132,10 @@ Begin
               Savemoves(outputFileName, buffer, buffercursor, buffermax, showEnemyMoves,
                         movesGroupSize);
 
-            End
-          Else
-            For i := LastPossibleMoveIndex Downto FirstPossibleMoveIndex Do
-              Begin
+            end
+          else
+            for i := LastPossibleMoveIndex Downto FirstPossibleMoveIndex do
+              begin
                 DoMove(moves[i]);
         {$IFDEF SHOULD_LOG}
                 writeln;
@@ -1145,14 +1145,14 @@ Begin
                       showEnemyMoves, outputFileName);
                 UndoMove(moves[i]);
                 moves[i] := CreateMove(0,0,0,0,0);
-              End;
+              end;
           countOfPossibleMoves := FirstPossibleMoveIndex - 1;
 
-        End;
-    End;
-End;
+        end;
+    end;
+end;
 
-Begin
+begin
   Initialize(cmdArgs, board);
   ShowChessBoard(board);
   readkey;
@@ -1177,4 +1177,4 @@ Begin
   writeln('Solved: ',cSolving);
   writeln('Watched: ', cVariants);
   readkey;
-End.
+end.

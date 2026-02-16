@@ -1,3 +1,3 @@
 program Simple;
-BEGIN
-END.
+begin
+end.

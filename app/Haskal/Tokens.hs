@@ -8,42 +8,55 @@ import Haskal.FileContent
 import Haskal.Parser
 
 data Token
-  = KeywordProgram
-  | Spaces String
-  | Id String
-  | SemiColon
-  | KeywordBegin
-  | KeywordUses
-  | TypeBoolean
-  | TypeInteger
-  | TypeString
-  | TypeLongint
-  | KeywordArray
-  | OperatorEqual
-  | MultilineComment String
-  | SingleLineComment String
-  | OperatorNotEqual
-  | OperatorMinus
-  | OperatorPlus
-  | OperatorStar
-  | OperatorLessThan
-  | OperatorLessThanOrEqual
-  | OperatorGreaterThan
-  | OperatorGreaterThanOrEqual
-  | OpenParens
+  = CloseBrackets
   | CloseParens
-  | OpenBrackets
-  | StringLiteral String
-  | CloseBrackets
-  | IntegerLiteral String
-  | KeywordRecord
   | Colon
   | Comma
-  | KeywordType
   | Directive String
-  | KeywordEnd
-  | DoubleDot
   | Dot
+  | DoubleDot
+  | Id String
+  | IntegerLiteral String
+  | KeywordArray
+  | KeywordBegin
+  | KeywordConst
+  | KeywordDo
+  | KeywordElse
+  | KeywordEnd
+  | KeywordFor
+  | KeywordFunction
+  | KeywordIf
+  | KeywordNot
+  | KeywordOf
+  | KeywordOperator
+  | KeywordProcedure
+  | KeywordProgram
+  | KeywordRecord
+  | KeywordThen
+  | KeywordType
+  | KeywordUses
+  | KeywordVar
+  | MultilineComment String
+  | OpenBrackets
+  | OpenParens
+  | OperatorAssign
+  | OperatorEqual
+  | OperatorGreaterThan
+  | OperatorGreaterThanOrEqual
+  | OperatorLessThan
+  | OperatorLessThanOrEqual
+  | OperatorMinus
+  | OperatorNotEqual
+  | OperatorPlus
+  | OperatorStar
+  | SemiColon
+  | SingleLineComment String
+  | Spaces String
+  | StringLiteral String
+  | TypeBoolean
+  | TypeInteger
+  | TypeLongint
+  | TypeString
   deriving (Show)
 
 newtype ParsingError = ParsingError (SourcePtr, String)
@@ -88,17 +101,29 @@ parseIdOrKeyword = convertIdToKeyword <$> parseIdString
   where
     convertIdToKeyword idString =
       case map toLower idString of
-        "program" -> KeywordProgram
-        "begin" -> KeywordBegin
-        "end" -> KeywordEnd
-        "uses" -> KeywordUses
-        "type" -> KeywordType
-        "boolean" -> TypeBoolean
-        "longint" -> TypeLongint
         "array" -> KeywordArray
+        "begin" -> KeywordBegin
+        "boolean" -> TypeBoolean
+        "const" -> KeywordConst
+        "do" -> KeywordDo
+        "else" -> KeywordElse
+        "end" -> KeywordEnd
+        "for" -> KeywordFor
+        "function" -> KeywordFunction
+        "if" -> KeywordIf
         "integer" -> TypeInteger
+        "longint" -> TypeLongint
+        "not" -> KeywordNot
+        "of" -> KeywordOf
+        "operator" -> KeywordOperator
+        "procedure" -> KeywordProcedure
+        "program" -> KeywordProgram
         "record" -> KeywordRecord
         "string" -> TypeString
+        "then" -> KeywordThen
+        "type" -> KeywordType
+        "uses" -> KeywordUses
+        "var" -> KeywordVar
         _ -> Id idString
 
 consumeWhile :: (Char -> Bool) -> Parser FileContent a String
@@ -161,6 +186,7 @@ tokenParser =
     <|> StringLiteral <$> stringLiteralStringParser
     <|> exactParser
       [ (";", SemiColon),
+        (":=", OperatorAssign),
         (":", Colon),
         ("..", DoubleDot),
         (".", Dot),
@@ -170,7 +196,7 @@ tokenParser =
         ("[", OpenBrackets),
         ("]", CloseBrackets),
         ("-", OperatorMinus),
-        ("+", OperatorMinus),
+        ("+", OperatorPlus),
         ("=", OperatorEqual),
         ("*", OperatorStar),
         ("<>", OperatorNotEqual),
@@ -269,3 +295,54 @@ multiLineCommentStringParser = do
   content <- consumeWhile (/= '}')
   _ <- parseExactChar '}'
   return content
+
+renderToken :: Token -> String
+renderToken (Directive string) = string
+renderToken (Id identifier) = identifier
+renderToken (IntegerLiteral literal) = literal
+renderToken (MultilineComment string) = "{" ++ string ++ "}"
+renderToken (SingleLineComment string) = "//" ++ string
+renderToken (Spaces spaces) = spaces
+renderToken (StringLiteral s) = "'" ++ s ++ "'"
+renderToken CloseBrackets = "]"
+renderToken CloseParens = ")"
+renderToken Colon = ":"
+renderToken Comma = ","
+renderToken Dot = "."
+renderToken DoubleDot = ".."
+renderToken KeywordArray = "array"
+renderToken KeywordBegin = "begin"
+renderToken KeywordConst = "const"
+renderToken KeywordDo = "do"
+renderToken KeywordEnd = "end"
+renderToken KeywordFor = "for"
+renderToken KeywordOf = "of"
+renderToken KeywordOperator = "operator"
+renderToken KeywordProcedure = "procedure"
+renderToken KeywordFunction = "function"
+renderToken KeywordProgram = "program"
+renderToken KeywordRecord = "record"
+renderToken KeywordType = "type"
+renderToken KeywordUses = "uses"
+renderToken KeywordIf = "if"
+renderToken KeywordThen = "then"
+renderToken KeywordElse = "else"
+renderToken KeywordVar = "var"
+renderToken KeywordNot = "not"
+renderToken OpenBrackets = "["
+renderToken OpenParens = "("
+renderToken OperatorAssign = ":="
+renderToken OperatorEqual = "="
+renderToken OperatorGreaterThan = ">"
+renderToken OperatorGreaterThanOrEqual = ">="
+renderToken OperatorLessThan = "<"
+renderToken OperatorLessThanOrEqual = "<="
+renderToken OperatorMinus = "-"
+renderToken OperatorNotEqual = "<>"
+renderToken OperatorPlus = "+"
+renderToken OperatorStar = "*"
+renderToken SemiColon = ";"
+renderToken TypeBoolean = "boolean"
+renderToken TypeInteger = "integer"
+renderToken TypeLongint = "longint"
+renderToken TypeString = "string"
