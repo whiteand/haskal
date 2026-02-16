@@ -348,9 +348,9 @@ procedure findKorol(color: longint; var i0,j0: longint);
 
 var i,j: longint;
 begin
-  for i:=1 To n do
+  for i := 1 To n do
     begin
-      for j:=1 To n do
+      for j := 1 To n do
         begin
           if board[i,j] = korol*color then
             begin
@@ -378,13 +378,13 @@ end;
 begin
   i := 8;
   j := 1;
-  for k:=1 To length(s) do
+  for k := 1 To length(s) do
     begin
       if (s[k]<>'') And (s[k]<>'/') then
         begin
           if (s[k] In ['1'..'8']) then
             begin
-              for z:=1 To ord(s[k]) - ord('0') do
+              for z := 1 To ord(s[k]) - ord('0') do
                 begin
                   board[i,j] := 0;
                   next;
@@ -470,9 +470,9 @@ procedure ReverseColors(var board: TBoard);
 
 var i, j: shortint;
 begin
-  for i:=1 To 8 do
+  for i := 1 To 8 do
     begin
-      for j:=1 To 8 do
+      for j := 1 To 8 do
         begin
           board[i,j] := -board[i,j];
         end;
@@ -482,9 +482,9 @@ procedure ClearBoard(var board: TBoard);
 
 var i,j: integer;
 begin
-  for i:=1 To n do
+  for i := 1 To n do
     begin
-      for j:=1 To n do
+      for j := 1 To n do
         begin
           board[i,j] := 0;
         end;
@@ -714,9 +714,9 @@ var f: text;
 begin
   assign(f,'out.txt');
   append(f);
-  for i:=1 To n do
+  for i := 1 To n do
     begin
-      for j:=1 To n do
+      for j := 1 To n do
         begin
           write(f, board[i,j]:3);
         end;
@@ -762,7 +762,7 @@ var f: text;
 begin
   assign(f, outputFileName);
   append(f);
-  for i:=1 To buffercursor do
+  for i := 1 To buffercursor do
     begin
       writeln(f,buffer[i]);
     end;
@@ -788,14 +788,14 @@ var i: longint;
 begin
   i := 1;
   s := '';
-  for i:=1 To countOfMakedMoves do
+  for i := 1 To countOfMakedMoves do
     begin
       if (i<=movesGroupSize) then
         begin
           if (lastMakedMoves[i] <> MakedMoves[i]) then AddStrToBuffer(buffer, buffercursor, '');
         end;
     end;
-  for i:=1 To countOfMakedMoves do
+  for i := 1 To countOfMakedMoves do
     begin
       if (i Mod 2 = 1) Or showEnemyMoves then
         begin
@@ -924,9 +924,9 @@ var i,j: longint;
   // Curent Figure
   curmov: Move;
 begin
-  for i:=1 To n do
+  for i := 1 To n do
     begin
-      for j:=1 To n do
+      for j := 1 To n do
         begin
           if (board[i,j]*color > 0) then
             begin
